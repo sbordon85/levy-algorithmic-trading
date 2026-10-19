@@ -1,30 +1,28 @@
 """
 window_selection.py
 
-Implementa la formula de cierre para la ventana rodante W_i (Seccion 2 de
-cierre_especificacion_estrategia.qmd):
+Implementa la fórmula de cierre para la ventana rodante W_i:
 
     W_i = max( W_E,i + W_T,i ,  W_i^Kaufman )
 
-Cada componente es una funcion determinista de los datos de UN activo -
-no hay parametro a elegir "a mano" salvo la grilla de busqueda, que la
-especificacion fija en {250, ..., 2500} pero sin indicar el paso. Se usa
-un paso de 50 dias habiles (documentado en GRID_STEP) como discretizacion
-practica de esa grilla; cualquier paso mas fino cambia el resultado en, a
-lo sumo, GRID_STEP dias.
+Cada componente es una función determinista de los datos de un activo -
+no hay parámetro a elegir "a mano" salvo la grilla de búsqueda, que la
+especificación fija en {250, ..., 2500} pero sin indicar el paso. Se usa
+un paso de 50 días hábiles (documentado en GRID_STEP) como discretización
+práctica de esa grilla; cualquier paso mas fino cambia el resultado en, a
+lo sumo, GRID_STEP días.
 
 Supuesto operativo explicito para W_i^Kaufman ("piso cualitativo"):
-la especificacion pide la "menor W candidata que cubre >=4 de los 5
-episodios del catalogo", sin fijar el criterio de deteccion. Se adopta el
+la especificación pide la "menor W candidata que cubre >=4 de los 5
+episodios del catalogo", sin fijar el criterio de detección. Se adopta el
 criterio mas directamente verificable con los datos ya disponibles en este
 framework: un episodio queda "cubierto" por la ventana W si, calculando la
-intensidad de saltos empirica (proxy de excedencias |z|>2, la misma
-evidencia de la Figura 1 de la especificacion) sobre una ventana rodante de
-longitud W, el z-score de esa intensidad supera EPISODE_DETECTION_Z en
-alguna fecha dentro de una tolerancia de +/-EPISODE_DATE_TOLERANCE_DAYS
-ruedas alrededor de alguna de las fechas listadas para ese episodio. Este
-supuesto queda aislado en `_episode_is_covered` para poder ajustarlo sin
-tocar el resto del modulo si el director de tesis fija un criterio distinto.
+intensidad de saltos empírica (proxy de excedencias |z|>2) 
+sobre una ventana rodante de longitud W, el z-score de esa intensidad 
+supera EPISODE_DETECTION_Z en alguna fecha dentro de una tolerancia de 
++/-EPISODE_DATE_TOLERANCE_DAYS ruedas alrededor de alguna de las fechas 
+listadas para ese episodio. Este supuesto queda aislado en `_episode_is_covered` 
+para poder ajustarlo sin tocar el resto del modulo solo si se decide cambiar el criterio.
 """
 
 from __future__ import annotations
@@ -40,55 +38,43 @@ from nig_model import fit_nig, jump_intensity, tail_quantiles, standard_errors
 GRID_MIN = 250
 GRID_MAX = 2500
 GRID_STEP = 50
-STABILIZATION_REL_CHANGE = 0.10  # 10%, Seccion 2
-STANDARDIZED_MAX_CHANGE = 1.0    # criterio "estandarizado": cambio < 1 error estandar
+STABILIZATION_REL_CHANGE = 0.10  # 10%
+STANDARDIZED_MAX_CHANGE = 1.0    # criterio "estandarizado": cambio < 1 error estándar
 
-# --- Criterios de estabilizacion de W_E (Fase 2, Entrega #4) -------------
-# "parametros"    : especificacion original. Cambio relativo de
+# --- Criterios de estabilización de W_E -------------
+# "parámetros"    : especificación original. Cambio relativo de
 #                   (alpha, beta, delta, mu) < 10% entre pasos de la grilla.
-#                   Problema: mu ~ 2e-4, asi que cualquier variacion minima es
+#                   Problema: mu ~ 2e-4, asi que cualquier variación mínima es
 #                   un cambio relativo enorme -> W_E se va al techo de la grilla
 #                   (4 de 5 activos en las corridas reales).
 # "sin_mu"        : igual que el anterior pero sin mu. Advertencia: beta
-#                   tambien puede estar cerca de cero en algun activo, con el
+#                   también puede estar cerca de cero en algún activo, con el
 #                   mismo problema.
-# "estandarizado" : cambio de cada parametro (incluido mu) medido en unidades
-#                   de su propio error estandar (Hessiano del MLE):
+# "estandarizado" : cambio de cada parámetro (incluido mu) medido en unidades
+#                   de su propio error estándar (Hessiano del maximum likelihood estimation):
 #                   max_k |theta_k(N') - theta_k(N)| / SE_k(N') < 1.
-#                   No depende de la escala del parametro.
+#                   No depende de la escala del parámetro.
 # "estimadores"   : estabilidad de lo que la estrategia efectivamente usa:
 #                   cambio relativo de (lambda_hat, percentil 5, percentil 95,
 #                   sigma) < 10%. Ninguna de esas cantidades esta cerca de cero.
 WINDOW_CRITERIA = ("parametros", "sin_mu", "estandarizado", "estimadores")
-DEFAULT_WINDOW_CRITERION = "estimadores"  # elegido con la corrida 1 (Entrega #4); "parametros" = especificacion original
+DEFAULT_WINDOW_CRITERION = "estimadores"  
 
 # Como se combinan W_E y W_T:
-# "suma" : especificacion original, W_i = max(W_E + W_T, W_Kaufman).
-# "max"  : W_i = max(W_E, W_T, W_Kaufman). Justificacion: W_E es la historia
+# "suma" : especificación original, W_i = max(W_E + W_T, W_Kaufman).
+# "max"  : W_i = max(W_E, W_T, W_Kaufman). Justificación: W_E es la historia
 #          necesaria para que el NIG se estabilice y W_T la necesaria para
-#          acumular ~10 excedencias; son dos requisitos sobre la MISMA ventana
-#          que se cumplen en paralelo, no uno despues del otro.
+#          acumular ~10 excedencias; son dos requisitos sobre la misma ventana
+#          que se cumplen en paralelo, no uno después del otro.
 WINDOW_COMBINE = ("suma", "max")
-DEFAULT_WINDOW_COMBINE = "max"          # elegido con la corrida 1; "suma" = especificacion original
-EXCEEDANCE_Z = 2.0               # |z|>2, consistente con la Figura 1
-EPISODE_DETECTION_Z = 1.0        # supuesto operativo, ver docstring del modulo
+DEFAULT_WINDOW_COMBINE = "max"          # elegido con la corrida 1; "suma" = especificación original
+EXCEEDANCE_Z = 2.0               # |z|>2
+EPISODE_DETECTION_Z = 1.0        # supuesto operativo
 EPISODE_DATE_TOLERANCE_DAYS = 5  # ruedas de tolerancia alrededor de cada fecha de episodio
-BYMA_RELAXED_EVENT_TARGET = 6    # excepcion BYMA (Seccion 2): objetivo relajado a 6 eventos
-DEFAULT_EVENT_TARGET = 4         # objetivo estandar: cubrir >=4 de 5 episodios
+BYMA_RELAXED_EVENT_TARGET = 6    # excepcion BYMA: objetivo relajado a 6 eventos
+DEFAULT_EVENT_TARGET = 4         # objetivo estándar: cubrir >=4 de 5 episodios
 
-# Catalogo de episodios sistemicos verificados (Seccion 1, 18 fechas agrupadas
-# en 5 episodios). Fechas en formato ISO.
-#
-# Correccion Fase 0 (Entrega #4): la version de la Entrega #3 tenia 19 fechas
-# y no coincidia con el catalogo de los .qmd (estabilidad_subperiodos_regimenes,
-# particion_train_val_test):
-#   - "2025-08-09" (sabado, no es rueda habil) era un intercambio dia/mes de
-#     "2025-09-08" (lunes posterior a las elecciones legislativas bonaerenses
-#     del 7-sep-2025). Corregido.
-#   - "2024-07-24" no figura en el catalogo documentado; se elimina para volver
-#     a las 18 fechas que citan la especificacion y el PDF de la Entrega #3.
-#     Si se decide conservarla, agregarla TAMBIEN en los .qmd.
-# Se verifico que las 18 fechas sean ruedas habiles.
+# Catalogo de episodios sistémicos verificados
 EPISODE_CATALOG: dict[str, list[str]] = {
     "crisis_cambiaria_2018": ["2018-06-18", "2018-08-31"],
     "paso_2019": ["2019-08-12", "2019-08-20", "2019-09-03"],
@@ -118,20 +104,19 @@ class WindowBreakdown:
     # "estabiliza"     : hay un N de la grilla desde el cual el criterio se
     #                    cumple en todos los N' mayores, con al menos 2 pasos
     #                    posteriores de evidencia.
-    # "en_borde"       : el criterio solo se cumple en el ultimo punto (o
-    #                    penultimo) de la grilla -- se cumple "por defecto",
-    #                    sin evidencia de convergencia (ver particion_train_val_test.qmd).
+    # "en_borde"       : el criterio solo se cumple en el último punto (o
+    #                    penúltimo) de la grilla.
     # "no_estabiliza"  : nunca se cumple; W_E = techo de la grilla.
     we_status: str = ""
 
 
 def _stability_vector(x: np.ndarray, criterion: str):
-    """Vector de cantidades cuya estabilidad se evalua, y su escala."""
+    """Vector de cantidades cuya estabilidad se evalúa, y su escala."""
     params = fit_nig(x)
     if params is None:
         return None
     theta = np.array([params.alpha, params.beta, params.delta, params.mu])
-    if criterion == "parametros":
+    if criterion == "parámetros":
         return theta, None
     if criterion == "sin_mu":
         return theta[:3], None
@@ -152,9 +137,9 @@ def stabilization_window(
     return_status: bool = False,
 ):
     """
-    W_E,i: minimo N de la grilla desde el cual la medida de cambio entre
+    W_E,i: mínimo N de la grilla desde el cual la medida de cambio entre
     pasos consecutivos se mantiene por debajo del umbral en TODOS los N'
-    mayores (Seccion 2). Se calibra siempre con los ULTIMOS N retornos
+    mayores. Se calibra siempre con los últimos N retornos
     disponibles del activo. `criterion` elige que se mide (ver
     WINDOW_CRITERIA arriba).
 
@@ -193,12 +178,11 @@ def stabilization_window(
     candidates = sorted(changes.keys())
     for i, n in enumerate(candidates):
         if all(changes[m] < threshold for m in candidates[i:]):
-            # Evidencia minima: al menos 2 pasos de grilla posteriores que
+            # Evidencia mínima: al menos 2 pasos de grilla posteriores que
             # confirman la estabilidad. Si no, es un cumplimiento "en el borde".
             status = "estabiliza" if len(candidates) - i >= 3 else "en_borde"
             return (float(n), status) if return_status else float(n)
-    # Nunca estabiliza dentro de la grilla: techo de la grilla (limitacion
-    # documentada, no se extrapola mas alla de GRID_MAX).
+    # Nunca estabiliza dentro de la grilla: techo de la grilla (no se extrapola mas allá de GRID_MAX).
     w = float(candidates[-1])
     return (w, "no_estabiliza") if return_status else w
 
@@ -206,10 +190,7 @@ def stabilization_window(
 def mean_annual_exceedance_frequency(returns: pd.Series, exceedance_z: float = EXCEEDANCE_Z) -> float:
     """
     f_bar_i: frecuencia anual media de excedencias |z|>2 (z respecto del
-    desvio muestral completo del activo) - la misma evidencia empirica de la
-    Figura 1 de la especificacion. Reutilizada por `testing_power_window`
-    (Seccion 2) y por la correccion de rareza de King-Zeng en
-    `signal_generator.py` (tau_i = f_bar_i / 252, Seccion 4).
+    desvío muestral completo del activo).
     """
     x = returns.dropna()
     if len(x) == 0:
@@ -269,7 +250,7 @@ def kaufman_floor_window(
 ) -> tuple[float, int]:
     """
     W_i^Kaufman: menor W de la grilla que cubre >= event_target de los
-    episodios del catalogo (ver supuesto operativo en el docstring del modulo).
+    episodios del catalogo.
 
     Devuelve (W_kaufman, episodios_cubiertos_en_ese_W).
     """
@@ -288,8 +269,7 @@ def kaufman_floor_window(
             return float(n), covered
         if covered > best[1]:
             best = (float(n), covered)
-    # Ninguna ventana de la grilla alcanza el objetivo: se devuelve la mejor
-    # encontrada, documentado como limitacion (analogo a la excepcion BYMA).
+    # Ninguna ventana de la grilla alcanza el objetivo: se devuelve la mejor encontrada.
     return best
 
 
@@ -301,20 +281,16 @@ def compute_asset_window(
     combine: str = DEFAULT_WINDOW_COMBINE,
 ) -> WindowBreakdown:
     """
-    W_i = max(W_E,i + W_T,i, W_i^Kaufman)   (combine="suma", especificacion)
-    W_i = max(W_E,i, W_T,i, W_i^Kaufman)    (combine="max", variante Fase 2)
+    W_i = max(W_E,i + W_T,i, W_i^Kaufman)   (combine="suma", especificación)
+    W_i = max(W_E,i, W_T,i, W_i^Kaufman)    (combine="max" , alternativa razonable)
 
-    `criterion` elige el criterio de estabilizacion de W_E (WINDOW_CRITERIA).
+    `criterion` elige el criterio de estabilización de W_E (WINDOW_CRITERIA).
 
-    W_i se elige con toda la historia disponible del activo. El feedback de
-    la Entrega #3 acepta usar historia previa para preparar los indicadores;
-    lo que debe ser point-in-time es el entrenamiento de cada prediccion
-    (signal_generator.py). Se declara como supuesto.
+    W_i se elige con toda la historia disponible del activo.
 
-    Excepcion BYMA (Seccion 2):
+    Excepción BYMA:
     si W_Kaufman con objetivo de 4 episodios supera la historia disponible,
-    se relaja el objetivo a BYMA_RELAXED_EVENT_TARGET (6) - la unica
-    alternativa admitida por la especificacion, documentada como limitacion.
+    se relaja el objetivo a BYMA_RELAXED_EVENT_TARGET.
     """
     notes: list[str] = []
     if combine not in WINDOW_COMBINE:
@@ -346,32 +322,21 @@ def compute_asset_window(
         candidates = [v for v in (w_e, w_t, w_kaufman) if not np.isnan(v)]
     w_final = int(round(max(candidates))) if candidates else None
 
-    # Caso limite NO cubierto explicitamente por la especificacion: W_i puede
-    # superar la historia disponible del activo por CUALQUIERA de los dos
-    # terminos del maximo -- no solo por W_Kaufman (que es lo unico que
-    # activaba la "excepcion BYMA" de arriba), tambien por W_E+W_T solo. Un
-    # W_i > n_obs deja a ese activo con TODOS sus estimadores en NaN (window
-    # > longitud de la serie => nunca entra al bucle walk-forward) y lo
-    # excluye de facto del overlay, sin que main.py lo detecte hasta el
-    # final. Se aplica un tope PRACTICO -no es parte de la formula cerrada
-    # de la Seccion 2- cada vez que el W_i FINAL supera la historia
-    # disponible, sea cual sea el motivo: se recorta a n_obs menos un
-    # margen minimo (para que queden ruedas posteriores a la ventana sobre
-    # las que calibrar), y se documenta explicitamente en `notes`.
+
     if w_final is not None and w_final > n_obs:
-        margin = 100  # 30 dejaba el remanente justo al piso min_periods del z-score
+        margin = 100  
         capped = max(n_obs - margin, 0)
-        if capped >= 250:  # no tiene sentido un W por debajo del piso de la grilla (Seccion 2)
+        if capped >= 250:  
             notes.append(
                 f"W_i recortado de {w_final} a {capped} (tope practico = historia disponible "
                 f"- {margin} ruedas) para que {ticker} no quede sin estimadores; NO es parte de "
-                "la formula cerrada de la Seccion 2, es una salvaguarda de implementacion."
+                "la formula cerrada, es una salvaguarda de implementación."
             )
             w_final = capped
         else:
             notes.append(
                 f"W_i calculado ({w_final}) supera la historia disponible ({n_obs} obs.), y el "
-                "recorte practico daria una ventana por debajo del piso de la grilla (250) - se "
+                "recorte practico daría una ventana por debajo del piso de la grilla (250) - se "
                 f"deja W_i como esta, {ticker} quedara sin estimadores validos hasta que tenga "
                 "mas historia."
             )
