@@ -1,5 +1,5 @@
 """
-transaction_costs.py  (Entrega #4, punto 4: "Costos de transacción")
+transaction_costs.py 
 
 Incorporar o discutir comisiones, evaluar la liquidez de los activos operados
 y, cuando corresponda, considerar slippage e impacto de mercado.
