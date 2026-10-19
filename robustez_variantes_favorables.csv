@@ -1,0 +1,8 @@
+,variantes,mdd_mejor_que_EW,sharpe_no_peor_que_EW,sharpe_no_peor_que_fija
+costo,4,100.0,25.0,50.0
+criterio_W,3,100.0,0.0,0.0
+horizon,3,100.0,66.7,66.7
+hysteresis_pp,4,100.0,50.0,50.0
+rebalance,3,100.0,0.0,33.3
+u_multiplier,4,100.0,50.0,50.0
+TOTAL,21,100.0,33.3,42.9

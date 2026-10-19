@@ -1,0 +1,7 @@
+pandas
+numpy
+scipy
+statsmodels
+yfinance
+requests   # macro_data.py (API del BCRA); opcional si están los CSV en datos/macro/
+matplotlib   # gráficos del notebook

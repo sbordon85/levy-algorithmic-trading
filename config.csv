@@ -1,0 +1,20 @@
+,valor
+window_criterion,estimadores
+window_combine,max
+recalibration_step,1
+event_definition,horizonte
+tau_method,modelo
+walk_forward,True
+refit_step,1
+horizon,5
+u_multiplier,2.0
+hysteresis_pp,5.0
+rebalance,mensual
+cost_mode,variable
+spread_window,20
+aum_ars,500000000
+adv_cap_pct,0.1
+drawdown_floor,None
+cost_bps_per_side,"{'GGAL.BA': 113.3, 'PAMP.BA': 121.85, 'YPFD.BA': 112.1, 'BMA.BA': 127.55, 'BYMA.BA': 129.05}"
+cache_dir,cache_nig
+windows,None

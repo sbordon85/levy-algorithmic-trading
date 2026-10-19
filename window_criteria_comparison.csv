@@ -1,0 +1,41 @@
+activo,criterio_W,combinacion,W_i,estado_W_E,inicio_senal,inicio_exposicion,dias_evaluables,anios_evaluables,episodios_cubiertos,episodios,cv_lambda_pct,cambios_exposicion,exp_min,exp_media,exp_max
+GGAL.BA,parametros,suma,2747,no_estabiliza,2026-05-29,,0,0.0,0,,,0,,,
+PAMP.BA,parametros,suma,2747,en_borde,2026-05-29,,0,0.0,0,,,0,,,
+YPFD.BA,parametros,suma,2719,no_estabiliza,2026-04-21,,0,0.0,0,,,0,,,
+BMA.BA,parametros,suma,2735,no_estabiliza,2026-05-13,,0,0.0,0,,,0,,,
+BYMA.BA,parametros,suma,2163,no_estabiliza,2026-06-30,,0,0.0,0,,,0,,,
+GGAL.BA,parametros,max,2500,no_estabiliza,2025-05-28,2025-10-24,233,0.92,1,era_milei_2024_2025,0.67,15,80.3,85.6,97.5
+PAMP.BA,parametros,max,2500,en_borde,2025-05-28,2025-10-31,228,0.9,0,,1.51,11,53.1,92.9,97.3
+YPFD.BA,parametros,max,2500,no_estabiliza,2025-05-28,2025-10-31,228,0.9,0,,2.19,4,90.7,95.9,99.6
+BMA.BA,parametros,max,2500,no_estabiliza,2025-05-28,2025-10-24,233,0.92,1,era_milei_2024_2025,0.66,17,69.9,85.9,95.9
+BYMA.BA,parametros,max,2250,no_estabiliza,,,0,0.0,0,,,0,,,
+GGAL.BA,sin_mu,suma,2297,estabiliza,2024-07-30,2024-12-17,440,1.75,1,era_milei_2024_2025,1.75,15,80.8,89.1,99.8
+PAMP.BA,sin_mu,suma,2747,en_borde,2026-05-29,,0,0.0,0,,,0,,,
+YPFD.BA,sin_mu,suma,2319,estabiliza,2024-08-29,2024-12-17,440,1.75,1,era_milei_2024_2025,1.95,10,78.0,90.4,95.0
+BMA.BA,sin_mu,suma,2285,estabiliza,2024-07-12,2024-12-17,440,1.75,1,era_milei_2024_2025,2.69,17,77.1,89.6,99.6
+BYMA.BA,sin_mu,suma,2074,estabiliza,2026-02-20,,0,0.0,0,,,0,,,
+GGAL.BA,sin_mu,max,2050,estabiliza,2023-07-24,2023-10-25,721,2.86,2,"ciclo_electoral_2023, era_milei_2024_2025",4.51,17,2.0,90.0,95.5
+PAMP.BA,sin_mu,max,2500,en_borde,2025-05-28,2025-10-31,228,0.9,0,,1.51,1,90.2,94.5,96.1
+YPFD.BA,sin_mu,max,2100,estabiliza,2023-10-03,2024-01-10,671,2.66,1,era_milei_2024_2025,3.22,3,79.9,89.6,95.2
+BMA.BA,sin_mu,max,2050,estabiliza,2023-07-24,2023-10-25,721,2.86,2,"ciclo_electoral_2023, era_milei_2024_2025",7.48,16,0.1,89.6,95.5
+BYMA.BA,sin_mu,max,1850,estabiliza,2025-03-19,2025-09-10,264,1.05,1,era_milei_2024_2025,0.33,4,81.4,89.2,93.7
+GGAL.BA,estandarizado,suma,2047,estabiliza,2023-07-19,2023-10-20,724,2.87,2,"ciclo_electoral_2023, era_milei_2024_2025",4.54,49,48.1,91.6,98.8
+PAMP.BA,estandarizado,suma,2047,estabiliza,2023-07-19,2023-10-20,724,2.87,2,"ciclo_electoral_2023, era_milei_2024_2025",4.9,43,4.6,88.6,98.4
+YPFD.BA,estandarizado,suma,2419,estabiliza,2025-01-23,2025-05-05,352,1.4,1,era_milei_2024_2025,2.72,6,87.6,92.1,98.4
+BMA.BA,estandarizado,suma,2035,estabiliza,2023-07-03,2023-10-20,724,2.87,2,"ciclo_electoral_2023, era_milei_2024_2025",7.82,63,35.5,91.0,99.0
+BYMA.BA,estandarizado,suma,2024,estabiliza,2025-12-04,,0,0.0,0,,,0,,,
+GGAL.BA,estandarizado,max,1800,estabiliza,2022-07-14,2022-12-26,925,3.67,2,"ciclo_electoral_2023, era_milei_2024_2025",7.83,24,13.2,87.7,96.9
+PAMP.BA,estandarizado,max,1800,estabiliza,2022-07-14,2022-12-26,925,3.67,2,"ciclo_electoral_2023, era_milei_2024_2025",8.02,4,84.3,92.1,97.8
+YPFD.BA,estandarizado,max,2200,estabiliza,2024-03-04,2024-06-07,571,2.27,1,era_milei_2024_2025,0.94,0,90.1,90.1,90.1
+BMA.BA,estandarizado,max,1800,estabiliza,2022-07-14,2022-12-26,925,3.67,2,"ciclo_electoral_2023, era_milei_2024_2025",12.97,14,69.9,89.0,94.8
+BYMA.BA,estandarizado,max,1800,estabiliza,2025-01-06,2025-04-23,358,1.42,1,era_milei_2024_2025,0.82,2,86.0,91.9,92.9
+GGAL.BA,estimadores,suma,2047,estabiliza,2023-07-19,2023-10-20,724,2.87,2,"ciclo_electoral_2023, era_milei_2024_2025",4.54,4,83.8,90.3,94.2
+PAMP.BA,estimadores,suma,2047,estabiliza,2023-07-19,2023-10-20,724,2.87,2,"ciclo_electoral_2023, era_milei_2024_2025",4.9,8,70.7,87.1,93.1
+YPFD.BA,estimadores,suma,1919,estabiliza,2023-01-06,2023-04-13,852,3.38,2,"ciclo_electoral_2023, era_milei_2024_2025",5.65,15,58.4,88.4,94.9
+BMA.BA,estimadores,suma,2035,estabiliza,2023-07-03,2023-10-02,736,2.92,2,"ciclo_electoral_2023, era_milei_2024_2025",7.81,6,86.9,89.1,93.4
+BYMA.BA,estimadores,suma,574,estabiliza,2019-12-19,2020-09-22,1474,5.85,2,"ciclo_electoral_2023, era_milei_2024_2025",11.59,51,0.2,90.3,99.4
+GGAL.BA,estimadores,max,1800,estabiliza,2022-07-14,2022-10-18,971,3.85,2,"ciclo_electoral_2023, era_milei_2024_2025",8.05,10,67.8,89.6,95.4
+PAMP.BA,estimadores,max,1800,estabiliza,2022-07-14,2022-12-26,925,3.67,2,"ciclo_electoral_2023, era_milei_2024_2025",8.02,2,87.0,91.4,94.6
+YPFD.BA,estimadores,max,1700,estabiliza,2022-02-11,2022-07-27,1026,4.07,2,"ciclo_electoral_2023, era_milei_2024_2025",5.25,8,57.6,86.7,97.5
+BMA.BA,estimadores,max,1800,estabiliza,2022-07-14,2022-10-18,971,3.85,2,"ciclo_electoral_2023, era_milei_2024_2025",13.25,4,83.4,89.9,95.4
+BYMA.BA,estimadores,max,350,estabiliza,2019-01-22,2019-08-13,1744,6.92,4,"paso_2019, covid_petroleo_2020, ciclo_electoral_2023, era_milei_2024_2025",18.23,18,0.2,90.2,99.7
