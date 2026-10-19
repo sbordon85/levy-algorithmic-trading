@@ -1,4 +1,4 @@
-"""Diagnóstico estadístico previo a la calibración (prometido en Entrega #2, sec. 11).
+"""Diagnóstico estadístico previo a la calibración.
 
 Sobre log_return diario de cada backtest_<TICKER>_BA.csv (período evaluado, es decir,
 sin el calentamiento de la ventana rodante):
