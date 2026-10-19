@@ -1,5 +1,5 @@
 """
-execution_prices.py  (Entrega #4, punto 3: "Supuestos de ejecución")
+execution_prices.py
 
 Pregunta que responde: ¿cambia el resultado según A QUÉ PRECIO se ejecuta la
 decisión de la estrategia? Compara la convención base (cierre de t-1) contra
@@ -22,8 +22,6 @@ minutos u horas). yfinance entrega la serie diaria completa de la muestra
   - "cierre"  : cierre de t (el otro extremo del día).
   - base      : cierre de t-1 (lo que supone el motor desde la Entrega #3).
 
-Ninguna usa el volumen, así que NO son VWAP: son aproximaciones y deben
-declararse como tales.
 
 Cómo se modela
 --------------
@@ -31,7 +29,7 @@ El retorno de cierre a cierre de t se parte en dos tramos alrededor del precio
 de ejecución P:
 
     tramo previo  = P / cierre_{t-1} - 1     lo gana la posición que ya se tenía
-    tramo posterior = cierre_t / P - 1       lo gana la posición DESPUÉS de operar
+    tramo posterior = cierre_t / P - 1       lo gana la posición después de operar
 
 con (1 + previo)(1 + posterior) = 1 + retorno de t, que es el mismo retorno
 simple que usa el motor (incluye dividendos, porque el tramo previo se calcula
