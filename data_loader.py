@@ -5,23 +5,28 @@ Carga de datos históricos diarios de acciones del panel líder de BYMA vía yfi
 Fuente validada: yfinance con sufijo ".BA" tiene ~11 años de historia diaria
 para GGAL, PAMP, YPFD, BMA (desde 2015) y BYMA (desde 2017, fecha de su listado).
 
-Cortes por activo ("el universo fue depurado de contaminación por iliquidez temprana"): 
-GGAL, PAMP, YPFD y BMA se
+Cortes por activo (Sección 1 del cierre de especificación - "el universo fue
+depurado de contaminación por iliquidez temprana"): GGAL, PAMP, YPFD y BMA se
 cortan en 2015-01-01; BYMA se deja SIN corte (limpia desde su salida a
 cotizar en 2017, un corte artificial ahí solo recortaría historia útil).
 Ver `DEFAULT_START_BY_TICKER`.
 
-Precios ajustados
+Precios ajustados (corrección Fase 0, Entrega #4)
 -------------------------------------------------
 Se descarga SIEMPRE con `auto_adjust=False` (explícito) y:
   - `log_return` se calcula sobre `Adj Close` (ajustado por dividendos y
-    splits). 
+    splits), igual que en todos los .qmd de la tesina (AED, liquidez,
+    benchmarking, partición, riesgo de cola). Antes se usaba `Close` con el
+    default de yfinance, que cambió entre versiones (en yfinance >= 0.2.51 el
+    default pasó a auto_adjust=True), así que el pipeline y los .qmd podían
+    estar usando series distintas sin que nadie lo notara.
   - `Close`, `High`, `Low` y `Volume` quedan SIN ajustar: son los que
     necesitan el monto negociado (ADV) y el estimador de spread de
-    Corwin-Schultz.
+    Corwin-Schultz (Fase 5).
 
-Frecuencia: el framework trabaja a frecuencia DIARIA. La mejor frecuencia 
-intradiaria disponible en yfinance (1h, ~1085
+Frecuencia: el framework trabaja a frecuencia DIARIA. El diagnóstico real de
+`harness_sensibilidad_parametros.qmd` (Sección 7, corrido el 18-sep-2026)
+mostró que la mejor frecuencia intradiaria disponible en yfinance (1h, ~1085
 días) no cubre los episodios 2018, PASO 2019 ni Covid 2020 -- por eso la
 frecuencia diaria es una decisión respaldada por evidencia, no solo una
 limitación de la fuente.
@@ -36,7 +41,7 @@ import yfinance as yf
 
 DEFAULT_TICKERS = ["GGAL.BA", "PAMP.BA", "YPFD.BA", "BMA.BA", "BYMA.BA"]
 
-# Corte por activo. BYMA -> None: sin corte, se usa toda la
+# Corte por activo (Sección 1). BYMA -> None: sin corte, se usa toda la
 # historia que devuelva yfinance (arranca sola en su fecha de listado, 2017).
 DEFAULT_START_BY_TICKER: dict[str, str | None] = {
     "GGAL.BA": "2015-01-01",
@@ -52,7 +57,7 @@ PRICE_COLUMNS = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
 def _download(ticker: str, start: str | None, end: str | None) -> pd.DataFrame:
     """Único punto de contacto con yfinance (aislado para poder testearlo)."""
     if start is None:
-        # "Sin corte" (BYMA): pasar start=None a yfinance NO trae
+        # "Sin corte" (BYMA, Sección 1): pasarle start=None a yfinance NO trae
         # toda la historia (interpreta la ausencia de fechas como el período
         # por defecto, ~1 mes). Hay que pedir period="max" explícitamente.
         return yf.download(
@@ -68,7 +73,8 @@ def process_price_frame(raw: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
     Limpia un DataFrame crudo de yfinance (auto_adjust=False) y agrega
     `log_return` calculado sobre `Adj Close`.
 
-    - Aplana columnas MultiIndex (yfinance devuelve (campo, ticker)).
+    - Aplana columnas MultiIndex (yfinance devuelve (campo, ticker) aun
+      descargando un solo ticker en versiones recientes).
     - Descarta filas sin `Adj Close` y precios no positivos.
     - La primera fila queda sin retorno y se elimina.
     """
@@ -100,7 +106,7 @@ def load_price_data(
     ----------
     start : str | dict | None
         - "__default_by_ticker__" (default): usa `DEFAULT_START_BY_TICKER`,
-          el corte por activo (2015-01-01 salvo BYMA, sin corte).
+          el corte por activo de la Sección 1 (2015-01-01 salvo BYMA, sin corte).
         - str: una única fecha de corte aplicada a TODOS los tickers.
         - dict[ticker] -> fecha o None: corte explícito por ticker.
         - None: sin corte para ningún ticker.
@@ -135,9 +141,9 @@ def load_benchmark(
     end: str | None = None,
 ) -> pd.DataFrame:
     """
-    Carga el índice S&P Merval con la misma
+    Carga el índice S&P Merval (o el ticker indicado) con la misma
     convención que `load_price_data` (auto_adjust=False, log_return sobre
-    Adj Close). Se usa como referencia de mercado en comparators.py.
+    Adj Close). Se usa como referencia de mercado en comparators.py (Fase 3).
     """
     raw = _download(ticker, start, end)
     return process_price_frame(raw, ticker)
