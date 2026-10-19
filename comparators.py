@@ -1,40 +1,34 @@
 """
-comparators.py  (Entrega #4, Fase 3)
+comparators.py
 
 Motor de cartera con tenencias explícitas y comparadores de la estrategia.
 
-Por qué hace falta (feedback de la Entrega #3)
-----------------------------------------------
-El overlay de la Entrega #3 promediaba cada día los retornos de los activos.
-Eso equivale a REBALANCEAR A PESOS IGUALES TODOS LOS DÍAS SIN COSTO, tanto
-para la estrategia como para el benchmark, y además el benchmark no pagaba la
-compra inicial que la estrategia sí pagaba. Este módulo simula la cartera
-con tenencias en pesos y caja, de modo que:
+Este módulo simula la cartera con tenencias en pesos y caja, de modo que:
 
-  - las posiciones DERIVAN con los precios entre rebalanceos;
+  - las posiciones derivan con los precios entre rebalanceos;
   - cada rebalanceo (entre activos o dentro de un activo, por cambio de
     exposición) paga el costo por lado sobre el monto operado;
   - la compra inicial se cobra igual a todos;
-  - la frecuencia de rebalanceo entre activos es un supuesto EXPLÍCITO
+  - la frecuencia de rebalanceo entre activos es un supuesto explícito
     ("diario", "mensual", "trimestral", "nunca").
 
-La MISMA función (`simulate_portfolio`) se usa para la estrategia y para
+La misma función (`simulate_portfolio`) se usa para la estrategia y para
 todos los comparadores: la única diferencia entre ellos es la matriz de
 exposición objetivo por activo.
 
 Estructura de la cartera
 ------------------------
-Cada activo activo es un "bolsillo" (sleeve) con valor V_i = A_i + K_i
-(A_i: posición en el activo; K_i: caja del bolsillo, tasa 0).
+Cada activo es un "sleeve" con valor V_i = A_i + K_i
+(A_i: posición en el activo; K_i: caja del "sleeve", tasa 0).
 
   - Día de rebalanceo (según la frecuencia, o cuando cambia la composición):
-    V_i = NAV / N para cada activo activo y A_i = e_i * V_i.
-    Mover caja entre bolsillos no cuesta; comprar o vender el activo sí.
+    V_i = NAV / N para cada activo y A_i = e_i * V_i.
+    Mover caja entre "sleeves" no cuesta; comprar o vender el activo sí.
   - Otro día: si la exposición objetivo e_i cambió, A_i = e_i * V_i (solo en
     ese activo). Si no cambió, no se opera y la posición deriva con el precio.
 
 La exposición e_i del día t se decide con información hasta t-1 y se aplica
-al retorno de t (misma convención que backtest_engine).
+al retorno de t.
 
 Comparadores (`build_comparator_exposures`)
 -------------------------------------------
@@ -43,7 +37,7 @@ Todos usan los mismos activos y las mismas fechas que la estrategia:
   - "EW 100%": el benchmark equal-weight, ahora con compra inicial y
     rebalanceo con costos.
   - "Exposición fija": cada activo a la exposición media que tuvo la
-    estrategia. Es un diagnóstico EX POST (usa la media de todo el período),
+    estrategia. Es un diagnóstico ex post (usa la media de todo el período),
     no una regla implementable: separa el efecto de "estar menos invertido"
     del efecto de "cuándo" se baja la exposición.
   - "Vol targeting": e_t = min(1, sigma*_t / sigma_t), con sigma_t = desvío de
@@ -51,7 +45,7 @@ Todos usan los mismos activos y las mismas fechas que la estrategia:
     (expanding) de sigma hasta t-1. Misma banda de histéresis de 5 p.p.
   - "MA200": 100% si el precio de t-1 está sobre su media de 200 ruedas,
     0% si no.
-  - "Merval": índice S&P Merval, sin costos (no es invertible tal cual).
+  - "Merval": índice S&P Merval, sin costos.
 """
 
 from __future__ import annotations
@@ -98,12 +92,12 @@ def _is_rebalance_day(rule: str, t: pd.Timestamp, prev: pd.Timestamp | None) -> 
 
 def _size_after_cost(e: np.ndarray, V: np.ndarray, A: np.ndarray, c: np.ndarray) -> np.ndarray:
     """
-    Posición A' tal que, DESPUÉS de pagar el costo de llegar a ella, la
-    fracción invertida del bolsillo sea exactamente e:
+    Posición A' tal que, después de pagar el costo de llegar a ella, la
+    fracción invertida del "sleeve" sea exactamente e:
         A' = e * (V - c * |A' - A|).
     Compra (A' >= A): A' = e (V + c A) / (1 + e c).
     Venta  (A' <  A): A' = e (V - c A) / (1 - e c).
-    Evita que el costo deje caja negativa (apalancamiento implícito).
+    Evita que el costo deje caja negativa.
     """
     buy = e * (V + c * A) / (1 + e * c)
     sell = e * (V - c * A) / (1 - e * c)
@@ -119,11 +113,11 @@ def simulate_portfolio(
     cash_rate: pd.Series | None = None,
 ) -> pd.DataFrame | tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Simula una cartera equal-weight de bolsillos con tenencias explícitas.
+    Simula una cartera equal-weight de "sleeves" con tenencias explícitas.
 
-    Parameters
+    Parámetros:
     ----------
-    simple_returns : DataFrame fechas x activos, retornos SIMPLES diarios.
+    simple_returns : DataFrame fechas x activos, retornos simples diarios.
     target_exposure : DataFrame fechas x activos, exposición objetivo en
         fracción [0, 1]. NaN = activo fuera de la cartera ese día.
     cost_bps_per_side : costo por lado (pb): único, por activo (dict) o
@@ -131,18 +125,17 @@ def simulate_portfolio(
         de Corwin-Schultz conocido en t-1). Faltantes -> media del activo.
     return_trades : si True, devuelve además un DataFrame fechas x activos
         con el monto operado (con signo) en unidades del capital inicial
-        (1 = capital inicial). Multiplicado por el AUM inicial en pesos da
-        el monto de la orden, para el chequeo de ADV (liquidity.py).
-    rebalance : frecuencia del rebalanceo ENTRE activos.
-    cash_rate : Serie (fecha) con el rendimiento simple DIARIO de la caja,
+        (1 = capital inicial). Multiplicado por el AUM (Assets Under Management) inicial en pesos da
+        el monto de la orden, para el chequeo de ADV (Average Daily Volume).
+    rebalance : frecuencia del rebalanceo entre activos.
+    cash_rate : Serie (fecha) con el rendimiento simple diario de la caja,
         tasa vigente al cierre de t-1 (macro_data.daily_cash_return). La caja
-        de cada bolsillo lo devenga todos los días. None = caja al 0%
-        (comportamiento de la Entrega #3 y de las primeras corridas de la #4).
+        de cada "sleeve" lo devenga todos los días. None = caja al 0%.
 
-    Returns
+    Retornos:
     -------
     DataFrame con PORTFOLIO_COLUMNS, indexado por las fechas con al menos un
-    activo. `cost` y `turnover` están en fracción del NAV del inicio del día;
+    activo. `cost` y `turnover` están en fracción del NAV (Net Asset Value) del inicio del día;
     `exposure` es la fracción del NAV invertida al inicio del día, después
     de operar y pagar costos.
     """
@@ -174,7 +167,7 @@ def simulate_portfolio(
     n_days, n_assets = E.shape
 
     A = np.zeros(n_assets)   # posición en el activo
-    K = np.zeros(n_assets)   # caja de cada bolsillo
+    K = np.zeros(n_assets)   # caja de cada "sleeve" (tasa 0)
     free_cash = 1.0          # capital todavía no asignado (solo antes del primer día)
     prev_active = None
     prev_e = np.full(n_assets, np.nan)
@@ -372,8 +365,7 @@ def rebalance_sensitivity(result: dict, names=("Estrategia", "EW 100%")) -> pd.D
                          "retorno_anual": s["Retorno anualizado"], "sharpe": s["Sharpe"],
                          "max_drawdown": s["Max Drawdown"],
                          "costo_total_pp": 100 * df["cost"].sum()})
-    # Referencia Entrega #3: promedio diario de retornos (rebalanceo diario
-    # gratis entre activos; el benchmark no paga la compra inicial).
+    
     bt = result["backtest"]
     e3 = {"Estrategia": bt["portfolio_net_return"], "EW 100%": result["benchmark_return"]}
     for name in names:
