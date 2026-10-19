@@ -1,12 +1,6 @@
 """
-sensitivity.py  (Entrega #4, Fase 6)
+sensitivity.py
 
-Harness de sensibilidad de `harness_sensibilidad_parametros.qmd`, conectado
-al pipeline real. Responde la aclaración general del profesor: probar cuánto
-dependen los resultados de los supuestos.
-
-Qué se mide en cada variante
-----------------------------
 No alcanza con el Sharpe de la estrategia: con este universo, cualquier
 variante que esté ~90% invertida tiene un Sharpe parecido al del mercado. Por
 eso cada fila reporta, además, la diferencia contra:
@@ -19,10 +13,10 @@ si dif_sharpe_vs_fija se mantiene cerca de 0 en todas las variantes.
 
 Dos tipos de parámetro
 ----------------------
-- De SEÑAL (reajustan el logit): u (umbral de salto, u = k*sigma), h
+- De señal (reajustan el logit): u (umbral de salto, u = k*sigma), h
   (horizonte del evento), criterio de W. Cada variante corre el pipeline
   (con W fijos y NIG desde caché; u y h se derivan de los mismos parámetros).
-- De CARTERA (no tocan la señal): banda de histéresis (se reaplica sobre la
+- De cartera (no tocan la señal): banda de histéresis (se reaplica sobre la
   exposición cruda del panel), costo, frecuencia de rebalanceo y piso por
   drawdown. Son baratos: solo se re-simula la cartera.
 
@@ -58,7 +52,7 @@ PORTFOLIO_PARAMS = {
 }
 DRAWDOWN_GRID = {"d_max": [0.10, 0.20, 0.30], "kappa": [1.0, 2.0, 4.0], "e_min": [25.0, 50.0]}
 W_ALTERNATIVES = [("estimadores", "suma"), ("estandarizado", "max"), ("sin_mu", "max")]
-# Opción B (Entrega #4): W corta y FIJA, la misma para todos los activos.
+
 FIXED_WINDOWS = (500, 750, 1000)
 
 
@@ -117,7 +111,7 @@ def _cost_variant(label: str, result: dict, price_data):
 
 
 # --------------------------------------------------------------------------
-# OFAT
+# OFAT (One Factor At a Time)
 # --------------------------------------------------------------------------
 
 def run_ofat(result: dict, returns_by_asset: dict, price_data: dict | None = None,
@@ -127,8 +121,6 @@ def run_ofat(result: dict, returns_by_asset: dict, price_data: dict | None = Non
     """
     Varía un parámetro por vez alrededor de la configuración de `result`.
     La fila 'base' se recalcula con el mismo refit_step que las variantes.
-    `windows_table` (window_criteria_comparison.csv) habilita las variantes
-    de criterio de W.
     """
     from main import PipelineConfig, run_pipeline
 
@@ -204,7 +196,7 @@ def tornado_table(ofat: pd.DataFrame, metric: str = "dif_sharpe_vs_fija") -> pd.
 
 
 # --------------------------------------------------------------------------
-# Robustez con W corta y fija (opción B, feedback Entrega #3: "más historia")
+# Robustez con W corta y fija
 # --------------------------------------------------------------------------
 
 def _episodes_covered(index: pd.DatetimeIndex) -> list[str]:
@@ -231,27 +223,17 @@ def run_fixed_window_grid(result: dict, returns_by_asset: dict, price_data: dict
                           windows=FIXED_WINDOWS, refit_step: int = 5, reps: int = 1000,
                           verbose: bool = True) -> pd.DataFrame:
     """
-    Robustez con ventana corta FIJA (la misma W para los 5 activos).
-
-    Responde al feedback de la Entrega #3 ("incorporar más historia utilizable
-    para evaluar varios años"). NO cambia la especificación principal
-    (criterio 'estimadores'/'max'): es una prueba de si las conclusiones
-    (protege por nivel de exposición, no por timing) se sostienen con más
-    historia. Advertencia que hay que declarar: estas W NO pasan el criterio de
-    estabilización de W_E, así que el NIG es más ruidoso.
-
-    No son candidatas a elegir: no deben entrar a `run_configuration_grid`
-    ni al PBO. Si se las cuenta en el Deflated Sharpe, sumarlas a N.
-
+    Robustez con ventana corta fija (la misma W para los 5 activos).
+       
     Cada fila reporta (una por W, más la base para comparar):
       - cobertura: primera fecha, primera fecha con los 5 activos, años
         evaluables y episodios del catálogo cubiertos;
       - métricas en el período propio de cada variante;
-      - las mismas métricas en el período COMÚN a todas las variantes
+      - las mismas métricas en el período común a todas las variantes
         (prefijo `com_`), que es la comparación de igual a igual: el Sharpe de
         períodos distintos no es comparable;
-      - bootstrap estacionario pareado (IC 95%) de Sharpe(estrategia) −
-        Sharpe(exposición fija) y de MDD(estrategia) − MDD(EW), en el período
+      - bootstrap estacionario pareado (Intervalo de Confianza 95%) de Sharpe(estrategia) −
+        Sharpe(exposición fija) y de MDD (Maximum Drawdown, estrategia) − MDD(EW), en el período
         propio, y un veredicto sobre el timing.
     Todas las variantes usan el mismo `refit_step` (como run_ofat).
     """
@@ -327,7 +309,7 @@ def run_fixed_window_grid(result: dict, returns_by_asset: dict, price_data: dict
 
 
 # --------------------------------------------------------------------------
-# Robustez en dólares (Entrega #2: "evaluar la robustez en retornos en USD")
+# Robustez en dólares
 # --------------------------------------------------------------------------
 
 USD_PORTFOLIOS = ("Estrategia", "EW 100%", "Exposición fija (media ex post)", "Vol targeting", "MA200")
@@ -336,16 +318,15 @@ USD_PORTFOLIOS = ("Estrategia", "EW 100%", "Exposición fija (media ex post)", "
 def usd_view(result: dict, fx_usd_ars: pd.Series, tbill_pct: pd.Series, reps: int = 1000,
              names=USD_PORTFOLIOS) -> pd.DataFrame:
     """
-    Las MISMAS carteras (mismas exposiciones y costos) evaluadas en pesos y en dólares.
+    Las mismas carteras evaluadas en pesos y en dólares.
 
-    No recalibra nada: la señal se calcula con retornos en pesos, como en la
-    especificación; solo cambia la moneda en que se miden los resultados.
+    Solo cambia la moneda en que se miden los resultados.
       - retornos de cada activo: r_usd = (1 + r_ars) / (1 + variación USD/ARS) - 1;
       - la caja rinde el T-bill 3m (base 360), conocido en t-1;
       - Sharpe y Sortino en exceso de esa tasa.
     La fila 'pesos' usa la caución del `result` (result["cash_rate"]).
 
-    Advertencia a declarar: con el tipo de cambio OFICIAL, durante el cepo el
+    Con el tipo de cambio oficial, durante el cepo el
     peso parece menos depreciado de lo que estuvo (CCL/MEP), y los resultados en
     USD quedan sobrestimados. Es una cota, no el retorno dolarizado realizable.
     Vol targeting y MA200 conservan su señal calculada en pesos.
@@ -403,7 +384,7 @@ def drawdown_floor_grid(result: dict, grid: dict | None = None) -> pd.DataFrame:
 def factorial_two(result: dict, returns_by_asset: dict, p1: str, v1: list, p2: str, v2: list,
                   price_data: dict | None = None, refit_step: int = 5, verbose: bool = True) -> pd.DataFrame:
     """
-    Grilla factorial entre dos parámetros (Sección 5 del .qmd). Los de señal
+    Grilla factorial entre dos parámetros. Los de señal
     reajustan el pipeline; los de cartera se aplican sobre esa corrida.
     """
     from main import PipelineConfig, run_pipeline
@@ -437,7 +418,7 @@ def factorial_two(result: dict, returns_by_asset: dict, p1: str, v1: list, p2: s
 
 def by_asset_table(result: dict, cost=None) -> pd.DataFrame:
     """
-    Cada activo por separado (Sección 6 del .qmd): estrategia contra buy &
+    Cada activo por separado: estrategia contra buy &
     hold del mismo activo y contra exposición fija a su media, en las fechas
     en que el activo está en la cartera.
     """
