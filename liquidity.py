@@ -1,36 +1,30 @@
 """
-liquidity.py  (Entrega #4, Fase 5)
+liquidity.py
 
-Implementa lo que `restricciones_liquidez.qmd` y
-`reglas_salida_regimen_posicion.qmd` dejaron especificado pero no conectado
-al motor:
 
-1. Costo de ejecución VARIABLE (Corwin y Schultz, 2012)
+1. Costo de ejecución variable (Corwin y Schultz, 2012)
    Spread diario estimado con High/Low sin ajustar, variante backward-looking
    (usa t-1 y t), truncado en cero. Como el estimador diario es muy ruidoso
    (muchos ceros y picos), el costo usa la media de las últimas
-   `SPREAD_WINDOW` ruedas, conocida al cierre de t-1 (la operación de la fila
+   ruedas, conocida al cierre de t-1 (la operación de la fila
    t se ejecuta al cierre de t-1). Costo por lado = fijo (66,55 pb) + medio
-   spread. La media de largo plazo coincide, por construcción, con el costo
-   constante de la Fase 0; lo nuevo es que el costo SUBE en los días de
-   estrés, que es justamente cuando la estrategia opera.
+   spread. 
 
-2. Tope de participación de 10% del ADV
+2. Tope de participación de 10% del ADV (Average Daily Volume)
    ADV_20 en pesos (Close x Volume, sin ajustar) conocido en t-1. Con el
-   monto operado de cada día (motor de comparators.py) y un AUM hipotético
-   (500 millones de ARS, como en el .qmd, interpretado como valor de la
+   monto operado de cada día (motor de comparators.py) y un AUM (Amount Under Management) hipotético
+   (500 millones de ARS, interpretado como valor de la
    cartera en cada fecha) se cuentan las órdenes que superarían el 10% del
    ADV. Como el AUM es un supuesto arbitrario, se reporta además la
-   CAPACIDAD: el valor máximo de cartera (en pesos de la fecha de la orden)
-   con el que la orden no superaría el tope. Es un diagnóstico, no se fuerza
-   en el backtest.
+   capacidad: el valor máximo de cartera (en pesos de la fecha de la orden)
+   donde la orden no superaría el tope.
 
-3. Piso de exposición gatillado por drawdown (reglas de salida, Sección 4)
+3. Piso de exposición gatillado por drawdown (reglas de salida)
    Techo_t = 100% si DD_t >= -D_max; si no,
    max(E_min, 100% - kappa * (|DD_t| - D_max)); exposición final =
    min(exposición, techo). DD_t = caída del precio del activo desde su
    máximo de las últimas `lookback` ruedas, hasta t-1. Desactivado por
-   defecto; se evalúa como sensibilidad (Fase 6).
+   defecto.
 """
 
 from __future__ import annotations
@@ -46,9 +40,9 @@ from backtest_engine import (
 from window_selection import EPISODE_CATALOG
 
 SPREAD_WINDOW = 20          # ruedas para suavizar el spread diario
-ADV_WINDOW = 20             # ADV_20 (restricciones_liquidez.qmd)
-AUM_ARS = 500_000_000       # AUM hipotético (restricciones_liquidez.qmd), parametrizable
-ADV_CAP_PCT = 0.10          # tope de participación (mismo .qmd)
+ADV_WINDOW = 20             # ADV_20
+AUM_ARS = 500_000_000       # AUM hipotético, parametrizable
+ADV_CAP_PCT = 0.10          # tope de participación
 COST_MODES = ("medio", "p95", "variable")
 
 DEFAULT_DRAWDOWN_FLOOR = {"d_max": 0.20, "kappa": 2.0, "e_min": 25.0, "lookback": 252}
@@ -100,7 +94,7 @@ def cost_for_mode(mode: str, price_data: dict | None, window: int = SPREAD_WINDO
 def spread_by_episode(price_data: dict[str, pd.DataFrame], catalog: dict | None = None,
                       window_days: int = 5) -> pd.DataFrame:
     """
-    Validación de sentido del .qmd: spread medio en ±`window_days` ruedas de
+    Spread medio en ±`window_days` ruedas de
     cada episodio contra el spread medio de ese año calendario.
     """
     catalog = catalog or EPISODE_CATALOG
@@ -145,10 +139,10 @@ def adv_diagnostics(trades_units: pd.DataFrame, adv: pd.DataFrame, aum_ars: floa
     inicial (salida de simulate_portfolio(..., return_trades=True)).
     `nav_prev`: NAV de la cartera antes de operar ese día, en las mismas
     unidades (nav.shift(1), con 1 el primer día). Con él, cada orden se
-    expresa como FRACCIÓN DE LA CARTERA del día, y el AUM se interpreta como
+    expresa como fracción de la cartera del día, y el AUM se interpreta como
     el valor de la cartera en esa fecha, en pesos de esa fecha.
 
-    Sin `nav_prev`, el AUM es el capital INICIAL y la cartera crece con el
+    Sin `nav_prev`, el AUM es el capital inicial y la cartera crece con el
     NAV. Con un NAV que se multiplicó más de 100 veces en pesos, eso deja al
     final una cartera irreal frente al mercado.
 
