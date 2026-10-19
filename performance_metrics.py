@@ -1,39 +1,18 @@
 """
 performance_metrics.py
 
-Métricas de "desempeño ajustado por riesgo" de la Hipótesis de la Entrega #1:
-Sharpe, Sortino y Calmar en paralelo, más retorno/volatilidad anualizados y
+Métricas de "desempeño ajustado por riesgo":
+Sharpe, Sortino y Calmar, más retorno/volatilidad anualizados y
 Max Drawdown.
 
-Todas las funciones esperan RETORNOS SIMPLES diarios (no logarítmicos). Desde
-la Fase 0 de la Entrega #4, `backtest_engine.py` entrega `net_return` y el
-benchmark en retornos simples.
+Todas las funciones esperan retornos simples diarios (no logarítmicos).
 
-Estado de los parámetros (actualizado Fase 0, Entrega #4):
-  - Costo de transacción: CERRADO, con fuente documentada, en
-    `backtest_engine.py` (comisión + derecho de mercado + medio spread de
-    Corwin-Schultz, por lado).
-  - Tasa libre de riesgo (`risk_free_rate`): CERRADA en la Entrega #4 con
-    `macro_data.py` (caución a 1 día en pesos; T-bill 3m en la vista en USD).
-    Acepta un escalar (TNA anual, se divide por 252) o una SERIE de
-    rendimientos DIARIOS alineada por fecha (`macro_data.daily_cash_return`),
-    que es lo que usa el pipeline. El default 0.0 se conserva solo para
-    compatibilidad: con tasas nominales en pesos altas sobreestima Sharpe y
-    Sortino, así que las tablas reportables deben pasar la serie.
-    Calmar no se ajusta por tasa (retorno total / max drawdown).
-
-Correcciones de definición (Fase 0, Entrega #4):
   - `max_drawdown` mide la caída desde el capital inicial (NAV = 1) además de
-    los picos posteriores. Antes, si la serie arrancaba perdiendo, esa primera
-    caída no contaba como drawdown.
+    los picos posteriores.
   - `sortino_ratio` usa la desviación a la baja estándar
-    (Sortino & Price, 1994): sqrt(mean(min(r - rf, 0)^2)) sobre TODAS las
-    observaciones. Antes se usaba el desvío muestral de los retornos
-    negativos solamente, que no es la definición estándar y resta la media de
-    las pérdidas (subestimando la dispersión a la baja).
+    (Sortino & Price, 1994): sqrt(mean(min(r - rf, 0)^2)) sobre todas las
+    observaciones.
 
-TODO: definir cuál de las tres métricas es la principal (pregunta abierta de
-la Reunión #2).
 """
 
 from __future__ import annotations
@@ -59,7 +38,7 @@ def annualized_volatility(returns: pd.Series) -> float:
 
 
 def _daily_rf(returns: pd.Series, risk_free_rate):
-    """Tasa libre de riesgo DIARIA: serie (alineada por fecha), escalar anual o None (= 0)."""
+    """Tasa libre de riesgo diaria: serie (alineada por fecha), escalar anual o None (= 0)."""
     if risk_free_rate is None:
         return 0.0
     if isinstance(risk_free_rate, pd.Series):
@@ -92,7 +71,7 @@ def sortino_ratio(returns: pd.Series, risk_free_rate=0.0) -> float:
 
 
 def drawdown_series(returns: pd.Series) -> pd.Series:
-    """Drawdown diario, medido contra el máximo entre el capital inicial (1.0)
+    """Drawdown diario, medido contra el máximo entre el capital inicial
     y todos los NAV anteriores."""
     nav = (1 + returns.dropna()).cumprod()
     running_max = nav.cummax().clip(lower=1.0)
