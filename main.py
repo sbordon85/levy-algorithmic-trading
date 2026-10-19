@@ -1,13 +1,12 @@
 """
 main.py
 
-Orquesta el pipeline de punta a punta (Sección 5 de
-`cierre_especificacion_estrategia.qmd`) sobre el universo de 5 activos:
+Organiza el pipeline de punta a punta sobre el universo de 5 activos:
 
   1. Descarga y limpieza por activo (data_loader.py)
   2. Ventana W_i por activo (window_selection.py) -- criterio configurable
   3-4. Calibración NIG walk-forward + estimadores (levy_estimators.py)
-  5-7. Eventos, logit pooled POINT-IN-TIME, exposición con histéresis
+  5-7. Eventos, logit pooled Point-In-Time, exposición con histéresis
        (signal_generator.py)
   8. Backtest, overlay equal-weight y métricas (backtest_engine.py,
      performance_metrics.py)
@@ -20,18 +19,10 @@ Piezas reutilizables (notebook, Fase 6):
     signal_diagnostics(result)               -> cobertura y "señal viva" por activo
     compare_window_criteria(returns_by_asset, ...) -> diagnóstico para elegir W
 
-ESTADO (Entrega #4, Fases 1-2): el logit se entrena point-in-time (solo
-eventos con horizonte cerrado antes de cada decision). Defaults de
-`PipelineConfig` = configuracion cerrada en la Entrega #4:
-  - ventana: criterio "estimadores", combinacion "max" (elegido con la tabla
-    de `compare_window_criteria`, sin mirar desempeno);
-  - evento: "horizonte" (r_{t->t+h} fuera de los percentiles 5/95 del NIG a
-    h dias; tasa implicada 10%);
-  - tau: "modelo" (frecuencia del MISMO evento implicada por el NIG).
-La especificacion original ("parametros"/"suma", "diaria", "excedencias")
-sigue disponible para trazabilidad.
+El logit se entrena point-in-time (solo
+eventos con horizonte cerrado antes de cada decision). 
 
-ADVERTENCIA DE RED: requiere acceso a Yahoo Finance (yfinance).
+Requiere acceso a Yahoo Finance (yfinance).
 """
 
 from __future__ import annotations
@@ -81,7 +72,7 @@ from comparators import (
 
 TICKERS = ["GGAL.BA", "PAMP.BA", "YPFD.BA", "BMA.BA", "BYMA.BA"]
 
-# 1 = recalibración diaria del NIG (cierra la especificación). Para la
+# 1 = recalibración diaria del NIG. Para la
 # comparación de criterios de W (varias corridas) conviene 5; para la
 # corrida que se reporta, 1.
 RECALIBRATION_STEP = 1
@@ -89,15 +80,15 @@ RECALIBRATION_STEP = 1
 
 @dataclass
 class PipelineConfig:
-    window_criterion: str = DEFAULT_WINDOW_CRITERION   # parametros | sin_mu | estandarizado | estimadores
+    window_criterion: str = DEFAULT_WINDOW_CRITERION   # parámetros | sin_mu | estandarizado | estimadores
     window_combine: str = DEFAULT_WINDOW_COMBINE       # suma | max
     recalibration_step: int = RECALIBRATION_STEP
     event_definition: str = DEFAULT_EVENT_DEFINITION   # diaria | horizonte
     tau_method: str = DEFAULT_TAU_METHOD               # excedencias | modelo
-    walk_forward: bool = True                          # False = ajuste único E3 (con look-ahead)
+    walk_forward: bool = True                          # False = ajuste único con look-ahead
     refit_step: int = 1                                # reajuste del logit (1 = diario)
     horizon: int = HORIZON_H
-    u_multiplier: float = 2.0                          # umbral de salto u = k * sigma_hat (Sección 3)
+    u_multiplier: float = 2.0                          # umbral de salto u = k * sigma_hat
     hysteresis_pp: float = HYSTERESIS_PP
     rebalance: str = DEFAULT_REBALANCE                 # diario | mensual | trimestral | nunca (entre activos)
     cost_mode: str = "variable"                        # medio | p95 | variable (Corwin-Schultz diario, Fase 5)
@@ -126,16 +117,13 @@ def run_pipeline(returns_by_asset: dict[str, pd.Series], config: PipelineConfig 
     Resultado principal (Fase 3): `portfolios` y `comparison` salen del motor
     de tenencias de comparators.py, con compra inicial y rebalanceo con
     costos (`config.rebalance`) para la estrategia y todos los comparadores.
-    `comparison_e3` conserva la comparación de la Entrega #3 (promedio diario
-    de retornos: rebalanceo diario gratis, benchmark sin compra inicial) solo
-    como referencia.
 
     Fase 5: con `price_data` (salida de load_price_data, con High/Low/Close/
     Volume) el costo puede ser variable (`config.cost_mode="variable"`) y se
     agrega el diagnóstico de participación en el ADV (`result["liquidity"]`).
     Sin `price_data`, el costo variable cae al costo medio constante.
 
-    Variables macro (Entrega #4): `cash_rate` es el rendimiento diario de la
+    Variables macro: `cash_rate` es el rendimiento diario de la
     caja (macro_data.daily_cash_return, caución a 1 día en pesos). Con él, la
     caja de la cartera rinde intereses y Sharpe/Sortino se calculan en exceso
     de la tasa. Sin él (None), caja al 0% y tasa libre de riesgo 0.
@@ -278,14 +266,8 @@ def compare_window_criteria(
     **config_kwargs,
 ) -> pd.DataFrame:
     """
-    Corre el pipeline para cada combinación de criterio de W y devuelve SOLO
-    diagnósticos de cobertura y de señal (no métricas de desempeño).
-
-    Nota metodológica: elegir el criterio de W mirando Sharpe o retorno sería
-    optimizar sobre la misma muestra que después se evalúa (data snooping).
-    La elección se justifica por (i) que W_E estabilice genuinamente (no "en
-    el borde"), (ii) que el período evaluable cubra episodios del catálogo y
-    (iii) que la señal varíe. El desempeño se mira una sola vez, después.
+    Corre el pipeline para cada combinación de criterio de W y devuelve solo
+    diagnósticos de cobertura y de señal.
     """
     tables = []
     for c in criteria:
@@ -302,7 +284,7 @@ def compare_window_criteria(
 
 
 def save_results(result: dict, prefix: str = "") -> list[str]:
-    """Guarda los resultados de una corrida en CSV (mismos nombres que la Entrega #3)."""
+    """Guarda los resultados de una corrida en CSV."""
     bt = result["backtest"]
     files = []
     f = f"{prefix}portfolio_backtest_result.csv"
