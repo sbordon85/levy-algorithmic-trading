@@ -1,24 +1,22 @@
 """
-protection.py  (Entrega #4, Fase 4)
-
-"¿La estrategia protege cuando se decide con la información disponible?"
+protection.py
 
 Toma las carteras de comparators.py (todas con el mismo motor, costos y
-fechas) y responde con cinco bloques de evidencia:
+fechas):
 
-1. Segmentación (estabilidad_subperiodos_regimenes.qmd)
+1. Segmentación
    - dentro / fuera de episodios del catálogo (±10 ruedas hábiles de cada
      fecha);
    - régimen de volatilidad: vol de 60 ruedas del benchmark EW contra su
-     mediana. Es una clasificación EX POST, para atribuir resultados, no para
+     mediana. Es una clasificación ex post, para atribuir resultados, no para
      generar señal;
    - tabla por episodio (retorno acumulado y drawdown dentro de la ventana);
-   - leave-one-episode-out: ¿la diferencia dentro de episodios depende de un
-     solo episodio?
+   - leave-one-episode-out: advierte si la diferencia dentro de episodios depende de un
+     solo episodio o no.
 
-2. Riesgo de cola (riesgo_cola_var_es.qmd)
-   VaR y ES históricos rolling OUT-OF-SAMPLE (ventana de 252 ruedas hasta
-   t-1), al 95% y 99%, con los tests de Kupiec (cobertura), Christoffersen
+2. Riesgo de cola
+   VaR (Value at Risk) y ES (Expected Shortfall) históricos rolling OUT-OF-SAMPLE (ventana de 252 ruedas hasta
+   t-1), al 95% y 99%, con los tests de Kupiec, Christoffersen
    (independencia; razón pi11/pi01 = magnitud del clustering) y cobertura
    condicional.
 
@@ -26,9 +24,7 @@ fechas) y responde con cinco bloques de evidencia:
    intervalos de confianza de la diferencia de Sharpe, retorno, drawdown y
    Calmar entre la estrategia y cada comparador.
 
-4. Deflated Sharpe Ratio (Bailey y López de Prado, 2014): ¿el Sharpe sigue
-   siendo significativo después de descontar cuántas configuraciones se
-   probaron?
+4. Deflated Sharpe Ratio (Bailey y López de Prado, 2014).
 
 5. Probability of Backtest Overfitting (Bailey, Borwein, López de Prado y
    Zhu, 2017), por validación cruzada combinatoria simétrica (CSCV).
@@ -51,9 +47,9 @@ from performance_metrics import max_drawdown, summary
 from window_selection import EPISODE_CATALOG
 
 TRADING_DAYS = 252
-EPISODE_WINDOW_DAYS = 10     # ±10 ruedas hábiles (estabilidad_subperiodos_regimenes.qmd)
-REGIME_VOL_WINDOW = 60       # vol de 60 ruedas para el régimen (mismo .qmd)
-VAR_WINDOW = 252             # riesgo_cola_var_es.qmd
+EPISODE_WINDOW_DAYS = 10     # ±10 ruedas hábiles
+REGIME_VOL_WINDOW = 60       # vol de 60 ruedas para el régimen
+VAR_WINDOW = 252             
 VAR_LEVELS = (0.95, 0.99)
 BOOTSTRAP_BLOCK = 20         # largo medio de bloque (ruedas)
 BOOTSTRAP_REPS = 2000
@@ -75,7 +71,7 @@ def episode_mask(index: pd.DatetimeIndex, catalog: dict | None = None,
         for d in dates:
             pos = index.searchsorted(pd.Timestamp(d))
             if pos >= len(index) or abs((index[min(pos, len(index) - 1)] - pd.Timestamp(d)).days) > 7:
-                continue   # fecha fuera del período evaluado
+                continue   
             mask[max(0, pos - window): min(len(index), pos + window + 1)] = True
     return pd.Series(mask, index=index)
 
@@ -147,7 +143,7 @@ def leave_one_episode_out(portfolios: dict[str, pd.DataFrame], versus: str = "EW
                           catalog: dict | None = None, window: int = EPISODE_WINDOW_DAYS,
                           risk_free_rate=None) -> pd.DataFrame:
     """
-    Métricas DENTRO de episodios con todos los episodios y excluyendo uno por
+    Métricas dentro de episodios con todos los episodios y excluyendo uno por
     vez. Si la ventaja de la estrategia desaparece al sacar un episodio, la
     evidencia depende de ese episodio.
     """
@@ -176,7 +172,7 @@ def leave_one_episode_out(portfolios: dict[str, pd.DataFrame], versus: str = "EW
 # --------------------------------------------------------------------------
 
 def var_es_rolling(returns: pd.Series, window: int = VAR_WINDOW, alpha: float = 0.95) -> tuple[pd.Series, pd.Series]:
-    """VaR y ES históricos (pérdida, positivos) estimados con [t-window, t-1]."""
+    """VaR y ES históricos estimados con [t-window, t-1]."""
     r = returns.dropna()
     q = r.rolling(window).quantile(1 - alpha).shift(1)
     var = -q
@@ -324,14 +320,14 @@ def bootstrap_table(portfolios: dict[str, pd.DataFrame],
 
 
 # --------------------------------------------------------------------------
-# 4-5. Múltiples configuraciones: Deflated Sharpe y PBO
+# 4-5. Múltiples configuraciones: Deflated Sharpe y PBO (Probability of Backtest Overfitting)
 # --------------------------------------------------------------------------
 
 def deflated_sharpe_ratio(returns: pd.Series, trial_sharpes: np.ndarray, n_trials: int | None = None) -> dict:
     """
     Deflated Sharpe Ratio (Bailey y López de Prado, 2014).
 
-    `trial_sharpes`: Sharpe POR PERÍODO (diario, sin anualizar) de todas las
+    `trial_sharpes`: Sharpe por período (diario, sin anualizar) de todas las
     configuraciones probadas. SR0 es el Sharpe máximo esperado por azar entre
     N pruebas independientes; DSR = P(SR verdadero > SR0), corrigiendo por
     asimetría y curtosis de los retornos elegidos.
@@ -364,8 +360,8 @@ def probability_backtest_overfitting(returns_matrix: pd.DataFrame, n_blocks: int
 
     `returns_matrix`: fechas x configuraciones, sin NaN (fechas comunes). Se
     parte en `n_blocks` bloques contiguos; para cada combinación de la mitad de
-    los bloques como "in-sample" se elige la configuración de mayor Sharpe IS y
-    se mira su ranking relativo OOS (w). PBO = P(logit(w) <= 0), es decir, la
+    los bloques como "in-sample" se elige la configuración de mayor Sharpe IS (In Sample) y
+    se mira su ranking relativo OOS (Out of Sample) (w, es el ranking relativo de esa configuración). PBO = P(logit(w) <= 0), es decir, la
     probabilidad de que la mejor configuración IS quede por debajo de la
     mediana OOS.
     """
@@ -429,7 +425,7 @@ def run_configuration_grid(
     del NIG; el logit se reajusta cada `refit_step` ruedas para que la grilla
     sea viable (solo afecta a esta evaluación de sobreajuste).
     """
-    from main import PipelineConfig, run_pipeline   # import diferido: evita ciclo
+    from main import PipelineConfig, run_pipeline   
 
     cols = {}
     for (crit, comb), windows in windows_by_criterion.items():
@@ -449,18 +445,17 @@ def run_configuration_grid(
 def overfitting_summary(grid_returns: pd.DataFrame, chosen: str, min_days: int = 2 * TRADING_DAYS,
                         n_blocks: int = 16, risk_free: pd.Series | None = None) -> dict:
     """
-    DSR de la configuración elegida y PBO, ambos sobre las FECHAS COMUNES de
+    DSR (Deflated Sharpe Ratio) de la configuración elegida y PBO, ambos sobre las fechas comunes de
     las configuraciones con al menos `min_days` de historia.
 
     Por qué el período común: el DSR usa la dispersión de los Sharpe de las
     pruebas. Si cada configuración cubre un período distinto (en la grilla
     real, de 48 días a 7 años), esa dispersión mezcla el efecto de la
     configuración con el del período, y el umbral SR0 se infla. N sigue
-    siendo el total de configuraciones probadas (criterio conservador).
-    `dsr_periodos_distintos` conserva el cálculo ingenuo como referencia.
+    siendo el total de configuraciones probadas.
     """
     if risk_free is not None:
-        # DSR y PBO sobre retornos en EXCESO de la tasa libre de riesgo.
+        # DSR y PBO sobre retornos en exceso de la tasa libre de riesgo.
         grid_returns = grid_returns.sub(risk_free.reindex(grid_returns.index).fillna(0.0), axis=0)
     daily_sr = grid_returns.apply(lambda c: c.dropna().mean() / c.dropna().std(ddof=1)
                                   if c.dropna().shape[0] > 20 else np.nan)
