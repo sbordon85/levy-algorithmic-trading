@@ -1,8 +1,8 @@
 """
-sens_calendar.py  (Entrega #4, punto 2: "Análisis de sensibilidad")
+sens_calendar.py 
 
 Completa a `sensitivity.py` (Fase 6) y a `robustness.py` con las variaciones de
-CONVENCIÓN OPERATIVA que el OFAT no cubría. No recalibra el NIG ni reajusta el
+convención operativa que el OFAT no cubría. No recalibra el NIG ni reajusta el
 logit (salvo `refit_step_check`): re-simula carteras sobre el `res` de
 `run_pipeline`.
 
@@ -22,7 +22,7 @@ Qué cubre cada pieza
 4. run_all                   Corre 1 y 2 (y 3 si se pasan los datos) y guarda CSV.
 
 Ya cubierto en otros módulos (no se repite acá):
-  - día de la semana en que se actualiza la EXPOSICIÓN y día del mes del
+  - día de la semana en que se actualiza la exposición y día del mes del
     rebalanceo mensual: robustness.weekday_update / monthly_rebalance_day;
   - u, h, criterio de W, histéresis, costo, frecuencia de rebalanceo (diario /
     mensual / trimestral / nunca), piso por drawdown, ventanas fijas, USD:
