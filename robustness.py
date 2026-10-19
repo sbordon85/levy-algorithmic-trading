@@ -1,8 +1,8 @@
 """
-robustness.py  (Entrega #4, punto 1: "Robustez del research")
+robustness.py
 
-Pregunta que responde: ¿los resultados dependen demasiado de una FECHA, un
-PARÁMETRO, un PERÍODO o una CONVENCIÓN del backtest?
+Pregunta que responde: ¿los resultados dependen demasiado de una fecha, un
+parámetro, un período o una convención del backtest?
 
 Complementa a `sensitivity.py` (Fase 6), que ya cubre el OFAT de parámetros, la
 grilla del piso por drawdown, las ventanas fijas y la vista en USD. Acá solo
@@ -357,7 +357,7 @@ def random_timing_mc(res: dict, n: int = 500, seed: int = 0, verbose: bool = Fal
     Placebo de timing por desplazamiento circular (Mayer-Krebs, cap. 9, con la
     variante del desplazamiento en lugar de sorteo activo/caja).
 
-    En cada réplica, la serie de exposición de CADA activo se desplaza
+    En cada réplica, la serie de exposición de cada activo se desplaza
     circularmente un número aleatorio de ruedas dentro de su propio período
     activo. Se conservan exactamente: la distribución de niveles (exposición
     media), el número de cambios y la autocorrelación de la exposición. Se
@@ -426,7 +426,7 @@ def dsr_vs_n(grid_returns: pd.DataFrame, chosen: str, n_values=(None, 50, 75, 10
 
     Replica el cálculo de protection.overfitting_summary: Sharpe de las
     configuraciones con al menos `min_days` de historia, medidos sobre las
-    FECHAS COMUNES (si cada una se midiera en su propio período, la dispersión
+    fechas comunes (si cada una se midiera en su propio período, la dispersión
     mezclaría período y configuración e inflaría SR0), y retornos en exceso de
     `risk_free`. La fila N = None usa el N de la grilla (todas las columnas) y
     debe coincidir con el DSR del notebook. Las demás filas suben N manteniendo
