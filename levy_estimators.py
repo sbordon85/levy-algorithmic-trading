@@ -1,42 +1,35 @@
 """
 levy_estimators.py
 
-Reemplaza los tres proxies empiricos (Entrega #2) por sus versiones
-calibradas via el proceso NIG, unico modelo de Levy definitivo elegido en
-`cierre_especificacion_estrategia.qmd` (Seccion 3):
-
-    Estimador                  Definicion cerrada
+    Estimador                  Definición cerrada
     --------------------------  ----------------------------------------------
     Intensidad de saltos        integral_{|x|>u} nu(x) dx, medida de Levy del
                                  NIG, u_t = 2*sigma_hat_t
-    Sesgo de asimetria           parametro beta del NIG (directo)
+    Sesgo de asimetría           parámetro beta del NIG (directo)
     Probabilidad de cola         percentiles 5/95 via CDF cerrada del NIG
-    Aceleracion                  lambda_t - lambda_{t-5}, estandarizada
+    Aceleración                  lambda_t - lambda_{t-5}, estandarizada
                                  (z_lambda, z_dlambda) dentro de la ventana W_i
 
-Control de look-ahead: la calibracion de la fila t usa EXCLUSIVAMENTE
+Control de look-ahead: la calibración de la fila t usa exclusivamente
 `returns.iloc[t-W:t]`, nunca el propio retorno de t. Todo lo que se calcula
-en la fila t (parametros, lambda, percentiles, z-scores) es conocido al
-cierre de t-1 y se usa para decidir la exposicion aplicada al retorno de t.
+en la fila t (parámetros, lambda, percentiles, z-scores) es conocido al
+cierre de t-1 y se usa para decidir la exposición aplicada al retorno de t.
 Se verifico perturbando los retornos futuros.
 
-Costo computacional: la especificacion pide reestimacion DIARIA (Seccion 4).
-`recalibration_step` permite recalibrar cada N ruedas (propagando el ultimo
-ajuste valido). Las cantidades derivadas (lambda, percentiles) solo se
-recalculan cuando cambian los parametros.
+Costo computacional: la especificación pide reestimación diaria.
+`recalibration_step` permite recalibrar cada N ruedas (propagando el último
+ajuste válido). Las cantidades derivadas (lambda, percentiles) solo se
+recalculan cuando cambian los parámetros.
 
-Agregados Fase 1-2 (Entrega #4)
 -------------------------------
 - `tail_low_h`, `tail_high_h`: percentiles 5/95 del retorno acumulado a
-  h dias (NIG convolucionado: delta*h, mu*h). Son los que corresponde usar
+  h días (NIG convolucionado: delta*h, mu*h). Son los que corresponde usar
   para etiquetar un evento sobre r_{t->t+h} (variante "horizonte").
 - `p_event_model_diaria`: probabilidad, implicada por el propio NIG, de que
-  r_{t->t+h} caiga fuera de los percentiles DIARIOS 5/95 (definicion de
-  evento de la especificacion original). Ronda 0.45, no 0.10: es la tasa de
-  eventos que esa definicion implica. Se usa en tau_method="modelo".
-- Cache en disco (`cache_dir`): la calibracion se guarda por (ticker, W,
-  recalibration_step, huella de los datos), para comparar criterios de W sin
-  recalibrar lo mismo dos veces.
+  r_{t->t+h} caiga fuera de los percentiles diarios 5/95 (definición de
+  evento de la especificación original).
+- Cache en disco (`cache_dir`): la calibración se guarda por (ticker, W,
+  recalibration_step, huella de los datos).
 """
 
 from __future__ import annotations
@@ -56,10 +49,10 @@ from nig_model import (
     tail_quantiles_horizon,
 )
 
-ACCELERATION_LAG = 5  # dias habiles, Seccion 3
-DEFAULT_U_MULTIPLIER = 2.0  # u = 2 * sigma_hat (Seccion 3)
-Z_SCORE_MIN_PERIODS = 30  # ver nota en compute_rolling_estimators
-DEFAULT_HORIZON = 5       # h de la Seccion 4 (mismo valor que signal_generator.HORIZON_H)
+ACCELERATION_LAG = 5  # días hábiles
+DEFAULT_U_MULTIPLIER = 2.0  # u = 2 * sigma_hat
+Z_SCORE_MIN_PERIODS = 30  
+DEFAULT_HORIZON = 5       
 
 _RAW_COLUMNS = [
     "alpha", "beta", "delta", "mu", "sigma",
@@ -99,9 +92,9 @@ def _derived(params, horizon: int, u_multiplier: float) -> dict:
 def _rederive(raw: pd.DataFrame, horizon: int, u_multiplier: float) -> pd.DataFrame:
     """
     Recalcula las cantidades derivadas (lambda con otro u, percentiles a otro
-    h) a partir de los parametros NIG ya calibrados, sin volver a hacer el
-    MLE. Se usa en el analisis de sensibilidad (Fase 6): u y h no cambian la
-    calibracion, solo lo que se deriva de ella.
+    h) a partir de los parámetros NIG ya calibrados, sin volver a hacer el
+    maximum likelihood estimation. Se usa en el análisis de sensibilidad: u y h no cambian la
+    calibración.
     """
     from nig_model import NIGParams
     out = raw.copy()
@@ -128,8 +121,7 @@ def _calibrate(returns: pd.Series, window: int, recalibration_step: int, horizon
     derived = None
     for i in range(window, n):
         if last_params is None or (i - window) % recalibration_step == 0:
-            # Un ajuste fallido deja NaN (no se rellena con el ajuste anterior),
-            # igual que en la version original.
+            # Un ajuste fallido deja NaN (no se rellena con el ajuste anterior).
             last_params = fit_nig(values[i - window : i])
             derived = None
         params = last_params
@@ -166,17 +158,17 @@ def compute_rolling_estimators(
     Returns
     -------
     pd.DataFrame indexado igual que `returns`, con columnas:
-        alpha, beta, delta, mu, sigma  (parametros NIG, por diagnostico)
+        alpha, beta, delta, mu, sigma  (parámetros NIG, por diagnóstico)
         jump_intensity                 lambda_hat_t
-        asymmetry                      beta_t (alias de beta, Seccion 3)
-        tail_low, tail_high            percentiles 5/95 del NIG DIARIO en t
-        tail_low_h, tail_high_h        percentiles 5/95 del NIG a h dias en t
+        asymmetry                      beta_t (alias de beta)
+        tail_low, tail_high            percentiles 5/95 del NIG diarios en t
+        tail_low_h, tail_high_h        percentiles 5/95 del NIG a h días en t
         p_event_model_diaria           P(r_{t->t+h} fuera de tail_low/high)
         intensity_change               lambda_t - lambda_{t-5}
-        z_lambda, z_dlambda            estandarizacion dentro de la ventana W
+        z_lambda, z_dlambda            estandarización dentro de la ventana W
     """
-    # La cache guarda la calibracion con el h y u de la especificacion (5 y
-    # 2*sigma). Otros valores (Fase 6) se derivan de los mismos parametros.
+    # La cache guarda la calibración con el h y u de la especificación (5 y
+    # 2*sigma).
     raw = None
     path = None
     if cache_dir is not None:
@@ -185,7 +177,7 @@ def compute_rolling_estimators(
             if path.exists():
                 raw = pd.read_pickle(path)
         except (OSError, EOFError, ValueError) as exc:
-            # La cache es solo una optimizacion: si el disco no responde o el
+            # La cache es solo una optimización: si el disco no responde o el
             # archivo esta corrupto, se recalcula en vez de cortar la corrida.
             warnings.warn(f"Cache ilegible ({path}): {exc}. Se recalcula.")
             raw = None
@@ -196,7 +188,7 @@ def compute_rolling_estimators(
                 path.parent.mkdir(parents=True, exist_ok=True)
                 raw.to_pickle(path)
             except OSError as exc:
-                # No perder minutos de calibracion por un fallo al guardar.
+                # No perder minutos de calibración por un fallo al guardar.
                 warnings.warn(f"No se pudo guardar la cache en {path.parent}: {exc}. "
                               "Se continua sin cache (revisar que la unidad este disponible).")
     if horizon != DEFAULT_HORIZON or u_multiplier != DEFAULT_U_MULTIPLIER:
@@ -206,10 +198,9 @@ def compute_rolling_estimators(
     df["asymmetry"] = df["beta"]
     df["intensity_change"] = df["jump_intensity"] - df["jump_intensity"].shift(ACCELERATION_LAG)
 
-    # Estandarizacion dentro de la ventana W_i (Seccion 3), con un piso FIJO
+    # Estandarización dentro de la ventana W_i, con un piso fijo
     # de observaciones (Z_SCORE_MIN_PERIODS). Un piso proporcional a W_i
-    # vaciaba el panel cuando W_i quedaba cerca del largo de la serie
-    # (Entrega #3). Solo usa valores pasados de lambda: sin look-ahead.
+    # vaciaba el panel cuando W_i quedaba cerca del largo de la serie.
     min_periods = Z_SCORE_MIN_PERIODS
     roll_lambda = df["jump_intensity"].rolling(window, min_periods=min_periods)
     df["z_lambda"] = (df["jump_intensity"] - roll_lambda.mean()) / roll_lambda.std(ddof=0)
