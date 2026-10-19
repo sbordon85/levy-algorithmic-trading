@@ -1,17 +1,20 @@
 """
 macro_data.py  (Entrega #4)
 
-Variables macro que se usan para (y no son insumo de las reglas de señal):
+Variables macro de CONTROL prometidas en la Entrega #2 (sección "Datos de
+control/contexto"). No son insumo de las reglas de señal, que dependen solo de
+precios; se usan para:
 
   1. Tasa libre de riesgo en pesos -> Sharpe y Sortino en exceso de la tasa, y
-     rendimiento de la CAJA de la cartera.
-  2. Tipo de cambio oficial USD/ARS y tasa en dólares.
+     rendimiento de la CAJA de la cartera (antes la caja rendía 0%, lo que
+     favorecía al benchmark 100% invertido).
+  2. Tipo de cambio oficial y tasa en dólares -> robustez de los resultados
+     expresados en USD (la exposición sigue siendo la del modelo en pesos).
 
-Elecciones:
-  - Tasa libre de riesgo en pesos: tasa de pases entre terceros a 1 día del BCRA 
-  (id_variable 150, TNA, base 365), usado como proxy de la caución a 1 día 
-  (el BCRA no publica la caución bursátil).
-  - Dólares: tipo de cambio oficial del BCRA y T-bill de EE.UU. a 3 meses
+Elecciones (confirmadas con el autor):
+  - Tasa en pesos: pase entre terceros a 1 día del BCRA (id_variable 150, TNA, base 365),
+    usado como proxy de la caución a 1 día (el BCRA no publica la caución bursátil).
+  - Dólares: tipo de cambio OFICIAL del BCRA y T-bill de EE.UU. a 3 meses
     (yfinance ^IRX, tasa de descuento, base 360).
 
 Fuentes y reproducibilidad
@@ -19,8 +22,8 @@ Fuentes y reproducibilidad
 Cada serie se lee de un snapshot CSV en `datos/macro/` (columnas `fecha`,
 `valor`). Si no existe, se descarga y se guarda el snapshot, para que la
 corrida (y la caché del NIG) sea reproducible sin red. Las descargas del BCRA
-usan la API pública del BCRA vía `requests`; las descargas de la tasa (v4.0, id 150) 
-y del tipo de cambio oficial (cambiarias v1.0) fueron verificadas;
+usan la API pública del BCRA vía `requests`; las descargas de la tasa (v4.0, id 150) y del tipo de cambio oficial (cambiarias v1.0) fueron
+verificadas por el autor contra la API real;
 `find_bcra_variables("pase")` lista los candidatos (la API v3.0 fue dada de baja; se usa v4.0).
 La serie usada es el id 150 ("Tasa de interés por operaciones de pases entre terceros a 1 día").
 Si la descarga automática falla, basta con dejar un CSV `fecha,valor` a mano.
@@ -28,14 +31,14 @@ Si la descarga automática falla, basta con dejar un CSV `fecha,valor` a mano.
 Convención temporal (igual que el resto del framework)
 ------------------------------------------------------
 `daily_cash_return` devuelve, para cada rueda t, el rendimiento de tener caja
-desde el cierre de t-1 hasta el cierre de t, con la tasa vigente al cierre de
+desde el cierre de t-1 hasta el cierre de t, con la tasa VIGENTE al cierre de
 t-1 (sin look-ahead). Los fines de semana y feriados devengan intereses: se
 multiplica por los días corridos entre ruedas.
 
 Advertencia sobre el tipo de cambio oficial
 -------------------------------------------
 Bajo el cepo (oct-2019 a abr-2025) el oficial subestima la depreciación
-efectiva del peso (existían el CCL y el MEP). Los resultados en dólares con el
+efectiva del peso (existían el CCL y el MEP). Los resultados en USD con el
 oficial deben leerse como una cota, no como el retorno dolarizado realizable.
 """
 
@@ -226,7 +229,7 @@ def load_caucion_tna(id_variable=None, start: str = "2015-01-01", end: str | Non
         if id_variable is None:
             raise FileNotFoundError(
                 f"No hay snapshot de la caución ({_snapshot_path(CAUCION_FILE, directory)}) y no se indicó "
-                "id_variable. Usá id_variable=150 (pase entre terceros a 1 día; ver find_bcra_variables('pase')) o dejar un CSV con columnas "
+                "id_variable. Usá id_variable=150 (pase entre terceros a 1 día; ver find_bcra_variables('pase')) o dejá un CSV con columnas "
                 "`fecha,valor` (TNA en %).")
         s = fetch_bcra_monetary(id_variable, start, end)
         save_snapshot(s, CAUCION_FILE, directory)
@@ -260,7 +263,7 @@ def load_tbill_tna(start: str = "2015-01-01", end: str | None = None,
 def daily_cash_return(rate_pct: pd.Series, trading_index: pd.DatetimeIndex,
                       day_count: int = DAY_COUNT_ARS) -> pd.Series:
     """
-    Rendimiento simple de la caja para cada rueda t: desde el cierre de t-1 hasta
+    Rendimiento SIMPLE de la caja para cada rueda t: desde el cierre de t-1 hasta
     el cierre de t, con la tasa vigente al cierre de t-1 (`rate_pct`, % anual).
     Devenga por días corridos entre ruedas. Antes de la primera observación de
     la tasa el rendimiento es 0 (se avisa cuántas ruedas quedan sin tasa).
