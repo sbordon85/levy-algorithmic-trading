@@ -1,5 +1,5 @@
 """
-Escalabilidad (Entrega #4, punto 5): ¿cómo cambia la estrategia con distintos niveles de AUM?
+Escalabilidad
 
 Depende de transaction_costs.py y robustness.py (misma carpeta). No modifica nada del pipeline.
 AUM en USD (se convierte a pesos con el USD/ARS oficial de cada fecha, `fx`).
