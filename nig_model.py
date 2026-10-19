@@ -1,22 +1,19 @@
 """
 nig_model.py
 
-Utilidades de bajo nivel para el proceso Normal Inverse Gaussian (NIG),
-elegido en cierre_especificacion_estrategia.qmd (Seccion 3) como el unico
-modelo de Levy definitivo del framework.
+Proceso Normal Inverse Gaussian (NIG),
+elegido como el único modelo de Levy definitivo del framework.
 
-Parametrizacion (alpha, beta, delta, mu) <-> parametrizacion de scipy (a, b, loc, scale):
+Parametrización (alpha, beta, delta, mu) <-> parametrización de scipy (a, b, loc, scale):
     alpha = a / scale      (tail heaviness)
-    beta  = b / scale      (asimetria)
+    beta  = b / scale      (asimetría)
     delta = scale          (escala)
-    mu    = loc            (locacion)
+    mu    = loc            (locación)
 
-con la restriccion |beta| < alpha (scipy exige 0 < |b| < a).
+con la restricción |beta| < alpha (scipy exige 0 < |b| < a).
 
-Todas las funciones trabajan sobre una unica escala temporal (retornos
-diarios, sin reescalar por el paso de tiempo de la medida de Levy) -
-consistente con el uso que hace `cierre_especificacion_estrategia.qmd` de
-`scipy.stats.norminvgauss` recalibrado directamente sobre retornos diarios.
+Todas las funciones trabajan sobre una única escala temporal (retornos
+diarios, sin reescalar por el paso de tiempo de la medida de Levy).
 """
 
 from __future__ import annotations
@@ -27,9 +24,8 @@ import numpy as np
 from scipy import integrate, special
 from scipy.stats import norminvgauss
 
-# Bajo esta cantidad de observaciones el MLE de 4 parametros es notoriamente
-# inestable; se usa como piso interno de seguridad (no es un parametro de
-# la especificacion, solo una guarda numerica).
+# Bajo esta cantidad de observaciones el MLE (maximum likelihood estimation) de 4 parámetros es notoriamente
+# inestable; se usa como piso interno de seguridad.
 MIN_OBS_FOR_FIT = 30
 
 
@@ -42,7 +38,7 @@ class NIGParams:
 
     @property
     def sigma(self) -> float:
-        """Desvio estandar del NIG: Var = delta * alpha^2 * (alpha^2-beta^2)^(-3/2)."""
+        """Desvío estándar del NIG: Var = delta * alpha^2 * (alpha^2-beta^2)^(-3/2)."""
         var = self.delta * self.alpha**2 * (self.alpha**2 - self.beta**2) ** (-1.5)
         return float(np.sqrt(var))
 
@@ -53,7 +49,7 @@ def fit_nig(window_returns: np.ndarray | "pd.Series") -> NIGParams | None:
     sobre una ventana de retornos.
 
     Devuelve None si la ventana es demasiado corta o si el ajuste no converge
-    a parametros validos (delta>0, |beta|<alpha) - el llamador debe propagar
+    a parámetros validos (delta>0, |beta|<alpha) - el llamador debe propagar
     esto como NaN, nunca "rellenar" con un valor arbitrario.
     """
     x = np.asarray(window_returns, dtype=float)
@@ -79,7 +75,7 @@ def _levy_density(x: np.ndarray, params: NIGParams) -> np.ndarray:
     Se calcula via la version exponencialmente escalada del Bessel
     (scipy.special.kve(1, z) = K1(z)*exp(z)) para evitar overflow*underflow
     (exp(beta*x) -> inf mientras K1(alpha*|x|) -> 0 en las colas lejanas),
-    que de otro modo produce NaN en cuadratura numerica sobre soporte infinito.
+    que de otro modo produce NaN en cuadratura numérica sobre soporte infinito.
     """
     x = np.asarray(x, dtype=float)
     absx = np.abs(x)
@@ -96,11 +92,11 @@ def _levy_density(x: np.ndarray, params: NIGParams) -> np.ndarray:
 
 def jump_intensity(params: NIGParams, threshold: float) -> float:
     """
-    Intensidad esperada de saltos significativos (Seccion 3):
+    Intensidad esperada de saltos significativos:
         lambda_hat = integral_{|x|>u} nu(x) dx,   u = threshold (>0)
 
-    Integra ambas colas por separado (la medida no es simetrica por beta != 0)
-    via cuadratura numerica (scipy.integrate.quad), ya que el NIG no tiene
+    Integra ambas colas por separado (la medida no es simétrica por beta != 0)
+    via cuadratura numérica (scipy.integrate.quad), ya que el NIG no tiene
     forma cerrada simple para esta integral truncada.
     """
     if threshold <= 0 or params is None:
@@ -119,7 +115,8 @@ def jump_intensity(params: NIGParams, threshold: float) -> float:
 
 
 def tail_quantiles(params: NIGParams, lower_q: float = 0.05, upper_q: float = 0.95):
-    """Percentiles 5/95 del NIG calibrado, via CDF cerrada (norminvgauss.ppf)."""
+    """Percentiles 5/95 del NIG calibrado, via CDF (cumulative distribution function) 
+    cerrada (norminvgauss.ppf)."""
     if params is None:
         return np.nan, np.nan
     a, b, loc, scale = (
@@ -136,17 +133,13 @@ def tail_quantiles(params: NIGParams, lower_q: float = 0.05, upper_q: float = 0.
     return float(lo), float(hi)
 
 
-# --------------------------------------------------------------------------
-# Agregados Fase 1-2 (Entrega #4)
-# --------------------------------------------------------------------------
-
 def horizon_params(params: NIGParams, h: int) -> NIGParams:
     """
-    Distribucion del retorno acumulado a h dias bajo el mismo proceso NIG.
+    Distribución del retorno acumulado a h días bajo el mismo proceso NIG.
 
-    El NIG es cerrado bajo convolucion: la suma de h retornos diarios iid
+    El NIG es cerrado bajo convolución: la suma de h retornos diarios iid
     NIG(alpha, beta, delta, mu) es NIG(alpha, beta, h*delta, h*mu). Es la
-    distribucion correcta contra la cual comparar r_{t->t+h} en el
+    distribución correcta contra la cual comparar r_{t->t+h} en el
     etiquetado de eventos (variante "horizonte" de signal_generator).
     """
     return NIGParams(alpha=params.alpha, beta=params.beta,
@@ -155,7 +148,7 @@ def horizon_params(params: NIGParams, h: int) -> NIGParams:
 
 def tail_quantiles_horizon(params: NIGParams, h: int,
                            lower_q: float = 0.05, upper_q: float = 0.95):
-    """Percentiles 5/95 del retorno acumulado a h dias (NIG convolucionado)."""
+    """Percentiles 5/95 del retorno acumulado a h días (NIG convolucionado)."""
     if params is None:
         return np.nan, np.nan
     return tail_quantiles(horizon_params(params, h), lower_q, upper_q)
@@ -168,12 +161,11 @@ def nig_cdf(x: float, params: NIGParams) -> float:
 
 def prob_outside(params: NIGParams, lo: float, hi: float, h: int = 1) -> float:
     """
-    P(r_{t->t+h} < lo  o  r_{t->t+h} > hi) bajo el NIG convolucionado a h dias.
+    P(r_{t->t+h} < lo  o  r_{t->t+h} > hi) bajo el NIG convolucionado a h días.
 
-    Con lo/hi = percentiles 5/95 del NIG a h dias da exactamente 0.10. Con
-    lo/hi = percentiles DIARIOS (definicion de evento de la especificacion
-    original) da la frecuencia de eventos que el propio modelo implica, que
-    es mucho mayor que 0.10 -- ver la variante tau_method="modelo".
+    Con lo/hi = percentiles 5/95 del NIG a h días da exactamente 0.10. Con
+    lo/hi = percentiles diarios da la frecuencia de eventos que el propio modelo implica, que
+    es mucho mayor que 0.10.
     """
     if params is None or not np.isfinite([lo, hi]).all():
         return np.nan
@@ -191,15 +183,15 @@ def _nll(theta: np.ndarray, x: np.ndarray) -> float:
 
 def standard_errors(window_returns, params: NIGParams) -> np.ndarray:
     """
-    Errores estandar asintoticos del MLE de (alpha, beta, delta, mu), via la
-    inversa del Hessiano numerico (diferencias centrales) de la
-    log-verosimilitud negativa en el optimo.
+    Errores estándar asintóticos del MLE de (alpha, beta, delta, mu), via la
+    inversa del Hessiano numérico (diferencias centrales) de la
+    log-verosimilitud negativa en el óptimo.
 
-    Se usa en el criterio de estabilizacion "estandarizado" de
-    window_selection.py: medir el cambio de cada parametro en unidades de su
-    propio error estandar evita el problema de dividir por un parametro
+    Se usa en el criterio de estabilización "estandarizado" de
+    window_selection.py: medir el cambio de cada parámetro en unidades de su
+    propio error estándar evita el problema de dividir por un parámetro
     cercano a cero (mu, y a veces beta), que hace que el criterio relativo de
-    la especificacion casi nunca se cumpla.
+    la especificación casi nunca se cumpla.
 
     Devuelve un array de 4 NaN si el Hessiano no es definido positivo.
     """
