@@ -1,84 +1,69 @@
 """
 signal_generator.py
 
-Implementa la funcion de exposicion cerrada en la Seccion 4 de
-`cierre_especificacion_estrategia.qmd`:
 
     P(Evento_{i,t}=1 | z_lambda, z_dlambda) =
         Logit^-1( alpha_i + b1*z_lambda + b2*z_dlambda + b3*z_lambda*z_dlambda )
     Exposicion_{i,t} = 100% * (1 - P_hat_{i,t})
 
 con efectos fijos alpha_i por activo, pendientes comunes al panel (pooled
-logit), correccion de rareza de King & Zeng (2001) sobre cada alpha_i,
-errores estandar Newey-West de 4 rezagos y banda de histeresis de 5 p.p.
+logit), corrección de rareza de King & Zeng (2001) sobre cada alpha_i,
+errores estándar Newey-West de 4 rezagos y banda de histeresis de 5 p.p.
 
-Convencion temporal (vale para todo el framework)
+Convención temporal (vale para todo el framework)
 -------------------------------------------------
 La fila t de los estimadores usa retornos hasta t-1 (levy_estimators.py). La
-exposicion calculada en la fila t se aplica al retorno de t
+exposición calculada en la fila t se aplica al retorno de t
 (backtest_engine.py). Es decir: la decision se toma al cierre de t-1 y rige
 desde el retorno de t.
 
-Fase 1 (Entrega #4): entrenamiento point-in-time
+Entrenamiento point-in-time
 ------------------------------------------------
-Feedback del profesor: "solo pueden entrar eventos cuyo horizonte de cinco
-dias ya haya terminado". En la Entrega #3 el logit se ajustaba UNA vez sobre
-todo el panel y esos coeficientes se usaban en TODAS las fechas: la
-exposicion del dia t dependia de eventos futuros. Ahora (`walk_forward=True`,
-default):
-
   - Cada evento etiquetado en la fecha s tiene una fecha `known_at` = ultima
-    rueda de su horizonte. Para decidir la exposicion de t solo entran al
+    rueda de su horizonte. Para decidir la exposición de t solo entran al
     entrenamiento los eventos con known_at < t (horizonte ya cerrado al
     cierre de t-1).
-  - El logit se reajusta cada `refit_step` ruedas (1 = diario, como pide la
-    especificacion) con ventana expanding.
+  - El logit se reajusta cada `refit_step` ruedas (1 = diario) con ventana expanding.
   - ybar (tasa de eventos de la muestra de entrenamiento) y tau_i (tasa
-    poblacional de King-Zeng) se calculan con informacion hasta t-1.
-  - Warm-up explicito: un activo no recibe exposicion hasta tener
+    poblacional de King-Zeng) se calculan con información hasta t-1.
+  - Warm-up explícito: un activo no recibe exposición hasta tener
     MIN_TRAIN_OBS_PER_ASSET observaciones y MIN_TRAIN_EVENTS_PER_ASSET
     eventos cerrados; el ajuste global exige MIN_TRAIN_EVENTS eventos.
   - Se guarda la historia de coeficientes (`fit.history`).
   - La ausencia de look-ahead se verifico perturbando todos los retornos
-    posteriores a una fecha y comprobando que la exposicion hasta esa fecha
+    posteriores a una fecha y comprobando que la exposición hasta esa fecha
     no cambia.
 
-`walk_forward=False` reproduce el ajuste unico de la Entrega #3 (con
-look-ahead), solo para cuantificar su efecto. No usar para reportar.
-
-Correccion de alineacion del evento (Fase 1)
+Corrección de alineación del evento
 --------------------------------------------
-Como la exposicion de t se aplica al retorno de t, el evento que corresponde
+Como la exposición de t se aplica al retorno de t, el evento que corresponde
 predecir es el del horizonte que esa decision afecta: r_t + ... + r_{t+h-1}.
-La version anterior usaba r_{t+1} + ... + r_{t+h}, salteando el primer dia
-afectado. Corregido; known_at = fecha de r_{t+h-1}.
+known_at = fecha de r_{t+h-1}.
 
-Definicion de evento (Fase 2, requiere decision del director)
+Definición de evento
 -------------------------------------------------------------
-- "diaria" (especificacion original): r_{t->t+h} fuera de los percentiles
-  5/95 del NIG DIARIO calibrado en t. Comparar un retorno de 5 dias contra
-  percentiles de 1 dia hace que el propio modelo implique ~45% de "eventos"
-  (ver nig_model.prob_outside), no 10%.
+- "diaria" (especificación original): r_{t->t+h} fuera de los percentiles
+  5/95 del NIG diario calibrado en t. Comparar un retorno de 5 días contra
+  percentiles de 1 día hace que el propio modelo implique ~45% de "eventos", no 10%.
 - "horizonte": r_{t->t+h} fuera de los percentiles 5/95 del NIG
-  convolucionado a h dias (delta*h, mu*h). Tasa implicada: exactamente 10%.
+  convolucionado a h días (delta*h, mu*h). Tasa implicada: exactamente 10%.
 
 Tasa poblacional tau_i para King-Zeng:
-- "excedencias" (especificacion): frecuencia anual de |z|>2 / 252, con la
-  historia del activo hasta t-1. Mide OTRA definicion de evento (retorno
-  diario extremo), por eso con la definicion "diaria" produce una
-  correccion muy grande de alpha_i.
-- "modelo": tasa de eventos implicada por el NIG bajo la MISMA definicion de
+- "excedencias": frecuencia anual de |z|>2 / 252, con la
+  historia del activo hasta t-1. Mide otra definición de evento (retorno
+  diario extremo), por eso con la definición "diaria" produce una
+  corrección muy grande de alpha_i.
+- "modelo": tasa de eventos implicada por el NIG bajo la misma definición de
   evento usada para etiquetar (0.10 en "horizonte"; promedio de
   p_event_model_diaria hasta t-1 en "diaria").
 
-Errores estandar
+Errores estándar
 ----------------
-statsmodels (Logit) no expone `get_robustcov_results` en la version usada.
-Se implementa a mano el sandwich `Bread * Meat * Bread` con Meat acumulado
-DENTRO de cada activo (Newey-West clustered por activo, Bartlett, 4
-rezagos); no captura correlacion contemporanea entre activos (Driscoll-Kraay).
-Se calcula solo para el ultimo ajuste (`fit.result`), porque la exposicion
-usa unicamente los coeficientes puntuales.
+Se implementa el sandwich `Bread * Meat * Bread` con Meat acumulado
+dentro de cada activo (Newey-West clustered por activo, Bartlett, 4
+rezagos); no captura correlación contemporánea entre activos (Driscoll-Kraay).
+Se calcula solo para el último ajuste (`fit.result`), porque la exposición
+usa únicamente los coeficientes puntuales.
 """
 
 from __future__ import annotations
@@ -92,18 +77,15 @@ import statsmodels.api as sm
 
 from window_selection import EXCEEDANCE_Z
 
-HORIZON_H = 5            # dias habiles, Seccion 4
-NW_LAGS = HORIZON_H - 1  # 4 rezagos, Seccion 4
-HYSTERESIS_PP = 5.0      # puntos porcentuales, Seccion 4
+HORIZON_H = 5            # días hábiles
+NW_LAGS = HORIZON_H - 1  # 4 rezagos
+HYSTERESIS_PP = 5.0      # puntos porcentuales
 
 EVENT_DEFINITIONS = ("diaria", "horizonte")
-DEFAULT_EVENT_DEFINITION = "horizonte"    # cerrado en Entrega #4 (antes "diaria", especificacion original)
+DEFAULT_EVENT_DEFINITION = "horizonte"    
 TAU_METHODS = ("excedencias", "modelo")
-DEFAULT_TAU_METHOD = "modelo"             # cerrado en Entrega #4 (antes "excedencias", especificacion original)
+DEFAULT_TAU_METHOD = "modelo"             
 
-# Warm-up del entrenamiento point-in-time (supuestos operativos, no
-# especificados en el cierre): un logit con efectos fijos necesita, para
-# cada activo, observaciones y eventos suficientes para estimar alpha_i.
 MIN_TRAIN_OBS_PER_ASSET = 60
 MIN_TRAIN_EVENTS_PER_ASSET = 5
 MIN_TRAIN_EVENTS = 20
@@ -273,14 +255,14 @@ def _attach_hac(fit: PooledLogitFit, train: pd.DataFrame, assets: list[str], nw_
     names = [f"alpha[{a}]" for a in assets] + [SLOT_NAMES[f] for f in FEATURES]
     if cov is not None:
         fit.bse_hac = pd.Series(np.sqrt(np.diag(cov)), index=names)
-        fit.cov_type_used = "Newey-West clustered-por-activo (manual), ultimo ajuste"
+        fit.cov_type_used = "Newey-West clustered-por-activo (manual), último ajuste"
     else:
         fit.bse_hac = pd.Series(np.asarray(res.bse), index=names)
         fit.cov_type_used = "nonrobust (el sandwich HAC no pudo calcularse)"
 
 
 def _newey_west_panel_cov(result, groups: np.ndarray, time: np.ndarray, maxlags: int):
-    """Sandwich Newey-West clustered por activo (ver docstring del modulo)."""
+    """Sandwich Newey-West clustered por activo."""
     try:
         score = result.model.score_obs(result.params)
         bread = np.asarray(result.cov_params())
@@ -326,9 +308,9 @@ def apply_hysteresis(
     initial_exposure: float | None = None,
 ) -> pd.Series:
     """
-    Banda de histeresis (Seccion 4): se mantiene el valor vigente si
-    |Delta Exposicion_t| < band_pp respecto del ultimo valor aplicado. Se
-    procesa en orden temporal, para UN activo.
+    Banda de histeresis: se mantiene el valor vigente si
+    |Delta Exposicion_t| < band_pp respecto del último valor aplicado. Se
+    procesa en orden temporal, para un activo.
     """
     out = pd.Series(np.nan, index=exposure_raw.index)
     current = initial_exposure
@@ -343,7 +325,7 @@ def apply_hysteresis(
 
 
 # --------------------------------------------------------------------------
-# Pipeline de la Seccion 4
+# Pipeline
 # --------------------------------------------------------------------------
 
 def _tau_at(method, returns_by_asset, panel, assets, before) -> dict[str, float]:
@@ -365,13 +347,13 @@ def generate_exposures(
 ) -> tuple[dict[str, pd.Series], PooledLogitFit | None, pd.DataFrame]:
     """
     Etiqueta eventos, ajusta el logit pooled (point-in-time si
-    walk_forward=True), calcula la exposicion cruda y aplica la histeresis.
+    walk_forward=True), calcula la exposición y aplica la histeresis.
 
     Returns
     -------
-    exposures : dict[ticker] -> exposicion en [0, 100] con histeresis,
+    exposures : dict[ticker] -> exposición en [0, 100] con histeresis,
         indexada como returns_by_asset[ticker] (NaN antes del warm-up).
-    fit : ultimo ajuste (con errores HAC y `history` de todos los ajustes),
+    fit : último ajuste (con errores HAC y `history` de todos los ajustes),
         o None si nunca hubo datos suficientes.
     panel : panel largo con p_hat, exposure_raw, fecha del ajuste usado
         (`fit_date`) y known_at, para auditoria.
@@ -389,7 +371,7 @@ def generate_exposures(
     if walk_forward:
         fit, history = _walk_forward(panel, has_x, labeled, returns_by_asset, refit_step, tau_method)
         if fit is not None:
-            # Errores HAC sobre la MISMA muestra del ultimo ajuste.
+            # Errores HAC sobre la misma muestra del último ajuste.
             last_t = history.index[-1]
             train = panel[labeled & (panel["known_at"] < last_t)]
             train = train[train["asset"].isin(list(fit.alpha_raw))]
